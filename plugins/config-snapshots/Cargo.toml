@@ -1,0 +1,13 @@
+[package]
+name = "config-snapshots"
+version.workspace = true
+edition = "2021"
+license = "MIT"
+description = "Capture and selectively restore supported agent files with change previews."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+plugin-suite = { path = "../../crates/plugin-suite" }
+serde_json = "1"

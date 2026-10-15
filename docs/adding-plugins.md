@@ -11,3 +11,5 @@
 All current plugins are Rust native libraries distributed for Windows x64. A plugin written in another language needs an explicit shared build adapter and CI support before it can be added. Do not list unsupported platforms as downloadable.
 
 The registry supports entries pointing to other repositories, but this collection's validator deliberately requires local entries to point here. Independently versioned plugins should use a separate release repository and a corresponding update to the validator/tooling.
+
+Shared library crates belong under `crates/` and do not need registry entries. The six agent-tool plugins use `plugin-suite::export_plugin!` with a workflow mode; independent workflows can implement their own native dispatch. Keep plugin-specific documentation and point to shared tests when behavior is intentionally shared.

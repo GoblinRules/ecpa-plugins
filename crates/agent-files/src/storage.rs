@@ -56,7 +56,7 @@ impl Store {
             home,
         })
     }
-    fn path(&self, id: &str) -> Result<PathBuf> {
+    pub fn path(&self, id: &str) -> Result<PathBuf> {
         if let Some(path) = self.overrides.get(id) {
             return Ok(path.clone());
         }
@@ -72,12 +72,17 @@ impl Store {
             _ => Err(bad("Unknown instruction file")),
         }
     }
-    fn backup_dir(&self, id: &str) -> Result<PathBuf> {
+    pub fn backup_dir(&self, id: &str) -> Result<PathBuf> {
         let p = self.path(id)?;
+        let namespace = if id == "document" {
+            hash(p.to_string_lossy().as_bytes())
+        } else {
+            id.into()
+        };
         Ok(p.parent()
             .unwrap()
             .join(".agent-instructions-backups")
-            .join(id))
+            .join(namespace))
     }
     pub fn read(&self, id: &str) -> Result<Value> {
         let p = self.path(id)?;
@@ -244,7 +249,7 @@ fn version(path: &Path, b: Option<&[u8]>) -> String {
         .as_bytes(),
     )
 }
-fn check_links(p: &Path) -> Result<()> {
+pub fn check_links(p: &Path) -> Result<()> {
     for ancestor in p.ancestors() {
         match fs::symlink_metadata(ancestor) {
             Ok(m) => {
@@ -283,6 +288,17 @@ fn read_file(p: &Path) -> Result<Option<Vec<u8>>> {
         return Err((413, "Instruction file exceeds 1 MiB".into()));
     }
     Ok(Some(bytes))
+}
+
+/// A single explicitly configured file, using the same backup/conflict protections.
+pub fn single(path: PathBuf) -> Store {
+    Store {
+        overrides: [("document".into(), path)].into_iter().collect(),
+        claude: PathBuf::new(),
+        codex: PathBuf::new(),
+        home: PathBuf::new(),
+        kimi: PathBuf::new(),
+    }
 }
 
 #[cfg(test)]

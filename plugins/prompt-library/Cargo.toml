@@ -1,0 +1,13 @@
+[package]
+name = "prompt-library"
+version.workspace = true
+edition = "2021"
+license = "MIT"
+description = "Searchable local prompts and instruction snippets with tags."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+plugin-suite = { path = "../../crates/plugin-suite" }
+serde_json = "1"

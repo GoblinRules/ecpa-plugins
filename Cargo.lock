@@ -3,8 +3,16 @@
 version = 4
 
 [[package]]
-name = "agent-instructions"
-version = "0.5.0"
+name = "agent-diagnostics"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
+]
+
+[[package]]
+name = "agent-files"
+version = "0.6.0"
 dependencies = [
  "base64",
  "dirs",
@@ -13,6 +21,36 @@ dependencies = [
  "serde_yaml_ng",
  "sha2",
  "tempfile",
+]
+
+[[package]]
+name = "agent-instructions"
+version = "0.6.0"
+dependencies = [
+ "agent-files",
+ "base64",
+ "dirs",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "agent-profiles"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
+]
+
+[[package]]
+name = "agent-skills"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
 ]
 
 [[package]]
@@ -41,6 +79,14 @@ name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
+
+[[package]]
+name = "config-snapshots"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
+]
 
 [[package]]
 name = "cpufeatures"
@@ -179,6 +225,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
+name = "mcp-manager"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -197,12 +251,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "plugin-suite"
+version = "0.6.0"
+dependencies = [
+ "agent-files",
+ "base64",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+ "toml_edit",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "prompt-library"
+version = "0.6.0"
+dependencies = [
+ "plugin-suite",
+ "serde_json",
 ]
 
 [[package]]
@@ -293,6 +369,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf41e0cfaf7226dca15e8197172c295a782857fcb97fad1808a166870dee75a3"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_yaml_ng"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -361,6 +446,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_datetime"
+version = "0.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.22.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41fe8c660ae4257887cf66394862d21dbca4a6ddd26f04a3560410406a2f819a"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_write",
+ "winnow",
+]
+
+[[package]]
+name = "toml_write"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
+
+[[package]]
 name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -397,6 +511,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "winnow"
+version = "0.7.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

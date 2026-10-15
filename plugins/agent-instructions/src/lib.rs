@@ -1,5 +1,4 @@
-mod config;
-mod storage;
+use agent_files::{config, storage};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use std::{

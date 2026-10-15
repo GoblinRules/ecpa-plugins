@@ -9,6 +9,7 @@ description = "Claude and Codex global instruction editor for CLIProxyAPI"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+agent-files = { path = "../../crates/agent-files" }
 base64 = "0.22"
 dirs = "6"
 serde = { version = "1", features = ["derive"] }

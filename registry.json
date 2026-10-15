@@ -9,7 +9,94 @@
       "repository": "https://github.com/GoblinRules/ecpa-plugins",
       "homepage": "https://github.com/GoblinRules/ecpa-plugins",
       "license": "MIT",
-      "tags": ["Management", "Instructions", "Claude", "Codex", "Kimi", "Grok", "ZCode", "Antigravity"]
+      "tags": [
+        "Management",
+        "Instructions",
+        "Claude",
+        "Codex",
+        "Kimi",
+        "Grok",
+        "ZCode",
+        "Antigravity"
+      ]
+    },
+    {
+      "id": "agent-profiles",
+      "name": "Agent Profiles",
+      "description": "Named instruction sets with previewed application and backups.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/agent-profiles",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
+    },
+    {
+      "id": "mcp-manager",
+      "name": "MCP Manager",
+      "description": "Edit Claude Code and Codex MCP server definitions with previews and backups.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/mcp-manager",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
+    },
+    {
+      "id": "agent-diagnostics",
+      "name": "Agent Diagnostics",
+      "description": "Read-only checks of instruction paths, file health and configuration syntax.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/agent-diagnostics",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
+    },
+    {
+      "id": "prompt-library",
+      "name": "Prompt Library",
+      "description": "Searchable local prompts and instruction snippets with tags.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/prompt-library",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
+    },
+    {
+      "id": "config-snapshots",
+      "name": "Config Snapshots",
+      "description": "Capture and selectively restore supported agent files with change previews.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/config-snapshots",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
+    },
+    {
+      "id": "agent-skills",
+      "name": "Agent Skills",
+      "description": "View, create and edit local SKILL.md files with validation and backups.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/agent-skills",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Agents"
+      ]
     }
   ]
 }

@@ -1,0 +1,13 @@
+[package]
+name = "agent-diagnostics"
+version.workspace = true
+edition = "2021"
+license = "MIT"
+description = "Read-only checks of instruction paths, file health and configuration syntax."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+plugin-suite = { path = "../../crates/plugin-suite" }
+serde_json = "1"
