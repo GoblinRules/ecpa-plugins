@@ -23,6 +23,12 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 - **[Config Snapshots](plugins/config-snapshots/README.md)** — Capture and selectively restore supported agent files with change previews.
 - **[Agent Skills](plugins/agent-skills/README.md)** — View, create and edit local SKILL.md files with validation and backups.
 
+## Interface and artwork
+
+All seven plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors adapt to ECPA’s embedded viewport, with compact headers, wrapping controls, shorter editors, and a compact agent selector in Agent Instructions.
+
+Plugin/store metadata publishes HTTPS logo URLs. Current ECPA versions that hardcode puzzle icons need the upstream card-logo UI change to display them; plugin updates cannot change host app buttons or cards. Find in store / Check for updates is also an ECPA app change (PR #458).
+
 ## Repository layout
 
 ```text

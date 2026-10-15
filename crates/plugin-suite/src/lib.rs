@@ -52,7 +52,7 @@ impl App {
                         return json!({"ok":false,"error":{"code":"invalid_config","message":message}})
                     }
                 }
-                json!({"schema_version":6,"metadata":{"Name":self.title,"Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":"https://github.com/GoblinRules/ecpa-plugins","ConfigFields":settings::fields(self.mode)},"capabilities":{"management_api":true}})
+                json!({"schema_version":6,"metadata":{"Name":self.title,"Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","Logo":format!("https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/{}.svg",self.id),"GitHubRepository":"https://github.com/GoblinRules/ecpa-plugins","ConfigFields":settings::fields(self.mode)},"capabilities":{"management_api":true}})
             }
             "management.register" => {
                 let routes: Vec<_> = self.routes().iter().map(|(method, path)| json!({"Method":method,"Path":format!("/v0/management/{}/{path}",self.id)})).collect();
@@ -94,7 +94,12 @@ impl App {
         if method == "GET" && path == format!("/v0/resource/plugins/{}/editor", self.id) {
             let html = include_str!("../web/app.html")
                 .replace("__PLUGIN_ID__", self.id)
-                .replace("__PLUGIN_TITLE__", self.title);
+                .replace("__PLUGIN_TITLE__", self.title)
+                .replace("__PLUGIN_ICON__", agent_files::icons::plugin(self.id))
+                .replace(
+                    "__AGENT_ICONS__",
+                    include_str!("../../../assets/agents/icons.js"),
+                );
             return http(200, "text/html; charset=utf-8", html.as_bytes());
         }
         let endpoint = self

@@ -115,6 +115,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
             }
             json!({"schema_version": 6,
                 "metadata": {"Name": "Agent Instructions", "Version": env!("CARGO_PKG_VERSION"), "Author": "GoblinRules",
+                    "Logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-instructions.svg",
                     "GitHubRepository": "https://github.com/GoblinRules/ecpa-plugins", "ConfigFields": config::fields()},
                 "capabilities": {"management_api": true}})
         }

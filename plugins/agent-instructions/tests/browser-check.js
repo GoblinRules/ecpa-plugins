@@ -24,7 +24,7 @@
   edit('Unsaved conflict draft');el('save').click();
   await until(()=>el('status').classList.contains('error')&&!el('reload').disabled);
   check(el('content').value==='Unsaved conflict draft','Conflict retains the draft');
-  check(el('status').textContent.includes('changed on disk'),'Conflict is explained');
+  check(el('status').textContent.includes('changed. Copy your draft, then reload'),'Conflict is explained');
   el('reload').click();await until(()=>el('confirm').open);el('accept').click();
   await until(()=>el('content').value==='Changed externally'&&!el('reload').disabled);
   check(el('backup').options.length>0,'Backups available');

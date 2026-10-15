@@ -18,7 +18,8 @@
         "Grok",
         "ZCode",
         "Antigravity"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-instructions.svg"
     },
     {
       "id": "agent-profiles",
@@ -31,7 +32,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-profiles.svg"
     },
     {
       "id": "mcp-manager",
@@ -44,7 +46,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/mcp-manager.svg"
     },
     {
       "id": "agent-diagnostics",
@@ -57,7 +60,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-diagnostics.svg"
     },
     {
       "id": "prompt-library",
@@ -70,7 +74,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/prompt-library.svg"
     },
     {
       "id": "config-snapshots",
@@ -83,7 +88,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/config-snapshots.svg"
     },
     {
       "id": "agent-skills",
@@ -96,7 +102,8 @@
       "tags": [
         "Management",
         "Agents"
-      ]
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-skills.svg"
     }
   ]
 }
