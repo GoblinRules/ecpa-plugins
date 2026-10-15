@@ -16,7 +16,7 @@ pub fn validate_config(id: &str, content: &str) -> Result<()> {
     }
     Ok(())
 }
-fn mcp_value(id: &str, content: &str) -> Result<Value> {
+pub(crate) fn mcp_value(id: &str, content: &str) -> Result<Value> {
     if content.is_empty() {
         return Ok(json!({}));
     }

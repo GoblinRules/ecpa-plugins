@@ -1,6 +1,108 @@
 use super::*;
 use std::fs;
 
+#[test]
+fn mcp_server_assignment_translation_rename_delete_and_conflicts() {
+    let (_dir, mut app, settings) = fixture(Mode::Mcp);
+    fs::write(&settings.configs["claude-config"], r#"{"keep":42,"mcpServers":{"old":{"command":"node","args":["old.js"]},"unrelated":{"command":"other"}}}"#).unwrap();
+    fs::write(
+        &settings.configs["codex-config"],
+        "# keep comment\nmodel = 'fixture'\n[mcp_servers.other]\ncommand = 'other'\n",
+    )
+    .unwrap();
+    let versions = |settings: &Settings| {
+        let files = tools::mcp_files(settings);
+        files
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| (f["id"].as_str().unwrap().to_string(), f["version"].clone()))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let v = versions(&settings);
+    let mut body = json!({"operation":"upsert","source":"claude-config","sourceVersion":v["claude-config"],"originalName":"old","name":"renamed","definition":{"type":"stdio","command":"node","args":["space here.js"],"env":{"KEY":"value"}},"targets":[{"id":"claude-config","version":v["claude-config"]},{"id":"codex-config","version":v["codex-config"]}]});
+    let preview = app.prepare(&settings, &body).unwrap();
+    assert_eq!(preview["changes"].as_array().unwrap().len(), 2);
+    // A target changed after preview: reject the whole batch before writing the source.
+    fs::write(
+        &settings.configs["codex-config"],
+        "# external\nmodel='fixture'\n",
+    )
+    .unwrap();
+    assert_eq!(app.apply(&settings, &preview).unwrap_err().0, 409);
+    assert!(fs::read_to_string(&settings.configs["claude-config"])
+        .unwrap()
+        .contains("old.js"));
+    assert_eq!(app.prepare(&settings, &body).unwrap_err().0, 409);
+    let v = versions(&settings);
+    body["targets"][1]["version"] = v["codex-config"].clone();
+    let preview = app.prepare(&settings, &body).unwrap();
+    app.apply(&settings, &preview).unwrap();
+    let claude: Value =
+        serde_json::from_str(&fs::read_to_string(&settings.configs["claude-config"]).unwrap())
+            .unwrap();
+    assert_eq!(claude["keep"], 42);
+    assert!(claude["mcpServers"].get("old").is_none());
+    assert_eq!(claude["mcpServers"]["unrelated"]["command"], "other");
+    let codex = fs::read_to_string(&settings.configs["codex-config"]).unwrap();
+    assert!(codex.contains("# external"));
+    let map = tools::mcp_value("codex-config", &codex).unwrap();
+    assert_eq!(map["renamed"]["args"][0], "space here.js");
+    assert!(map["renamed"].get("type").is_none());
+    let v = versions(&settings);
+    body["sourceVersion"] = v["claude-config"].clone();
+    body["originalName"] = json!("renamed");
+    body["targets"] = json!([{"id":"codex-config","version":v["codex-config"]}]);
+    body["definition"]["command"] = json!("updated");
+    assert_eq!(app.prepare(&settings, &body).unwrap_err().0, 409);
+    body["replaceExisting"] = json!(true);
+    let preview = app.prepare(&settings, &body).unwrap();
+    app.apply(&settings, &preview).unwrap();
+    // Removing from Claude leaves the Codex copy intact.
+    let v = versions(&settings);
+    let preview = app.prepare(&settings, &json!({"operation":"delete","source":"claude-config","sourceVersion":v["claude-config"],"originalName":"renamed","name":"renamed","targets":[{"id":"claude-config","version":v["claude-config"]}]})).unwrap();
+    app.apply(&settings, &preview).unwrap();
+    assert!(tools::mcp_value(
+        "codex-config",
+        &fs::read_to_string(&settings.configs["codex-config"]).unwrap()
+    )
+    .unwrap()
+    .get("renamed")
+    .is_some());
+}
+
+#[test]
+fn mcp_assignment_refuses_lossy_translation_and_preserves_advanced_fields() {
+    let (_dir, mut app, settings) = fixture(Mode::Mcp);
+    let files = tools::mcp_files(&settings);
+    let rows = files.as_array().unwrap();
+    let version = |id: &str| rows.iter().find(|f| f["id"] == id).unwrap()["version"].clone();
+    let mut body = json!({"operation":"upsert","source":"codex-config","sourceVersion":version("codex-config"),"name":"remote","definition":{"url":"https://example.com/mcp","http_headers":{"X-Test":"value"}},"targets":[{"id":"claude-config","version":version("claude-config")}]});
+    let preview = app.prepare(&settings, &body).unwrap();
+    let root: Value =
+        serde_json::from_str(preview["changes"][0]["after"].as_str().unwrap()).unwrap();
+    assert_eq!(root["mcpServers"]["remote"]["type"], "http");
+    assert_eq!(root["mcpServers"]["remote"]["headers"]["X-Test"], "value");
+    body["definition"]["bearer_token_env_var"] = json!("TOKEN");
+    assert!(app
+        .prepare(&settings, &body)
+        .unwrap_err()
+        .1
+        .contains("bearer_token_env_var"));
+    body["targets"] = json!([{"id":"codex-config","version":version("codex-config")}]);
+    let preview = app.prepare(&settings, &body).unwrap();
+    assert!(preview["changes"][0]["after"]
+        .as_str()
+        .unwrap()
+        .contains("bearer_token_env_var"));
+    body["definition"]["http_headers"] = json!({"bad":123});
+    assert!(app.prepare(&settings, &body).is_err());
+    body["operation"] = json!("delete");
+    body["source"] = json!("claude-config");
+    body["sourceVersion"] = version("claude-config");
+    assert!(app.prepare(&settings, &body).is_err());
+}
+
 fn fixture(mode: Mode) -> (tempfile::TempDir, App, Settings) {
     let dir = tempfile::tempdir().unwrap();
     let paths = [

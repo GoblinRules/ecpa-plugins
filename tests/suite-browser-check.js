@@ -1,5 +1,6 @@
 // Evaluate on each suite editor served by tests/suite_integration.py --serve.
 // Only use the isolated fixture: these tests intentionally create/modify fixture files.
+// MCP Manager has its own UI workflow in tests/mcp-browser-check.js since v0.7.0.
 (async () => {
   const assert = (condition, message) => { if (!condition) throw Error(message); };
   const wait = async (condition) => {

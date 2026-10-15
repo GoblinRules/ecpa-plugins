@@ -1,4 +1,5 @@
 mod abi;
+mod mcp;
 mod records;
 mod settings;
 mod tools;
@@ -102,7 +103,13 @@ impl App {
         let path = req["Path"].as_str().unwrap_or("");
         let method = req["Method"].as_str().unwrap_or("");
         if method == "GET" && path == format!("/v0/resource/plugins/{}/editor", self.id) {
-            let html = include_str!("../web/app.html")
+            let template = if self.mode == Mode::Mcp {
+                include_str!("../web/mcp.html")
+            } else {
+                include_str!("../web/app.html")
+            };
+            let html = template
+                .replace("__MCP_STYLES__", include_str!("../web/mcp.css"))
                 .replace("__PLUGIN_ID__", self.id)
                 .replace("__PLUGIN_TITLE__", self.title)
                 .replace("__PLUGIN_ICON__", agent_files::icons::plugin(self.id))
@@ -187,6 +194,8 @@ impl App {
         self.preview = None;
         let changes = if matches!(self.mode, Mode::Profiles | Mode::Snapshots) {
             records::preview(settings, self.mode, body)?
+        } else if self.mode == Mode::Mcp && body.get("operation").is_some() {
+            mcp::preview(settings, body)?
         } else {
             let id = text(body, "id")?;
             let current = read_target(id, self.target(settings, id)?)?;

@@ -17,7 +17,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 - **[Agent Instructions](plugins/agent-instructions/README.md)** — edit global instructions for Claude Code, Codex, Kimi Code, Grok Build, ZCode, and Antigravity. Includes backups, restore, conflict detection, and optional remembered login. Windows x64; tested with CLIProxyAPI v8.0.29.
 
 - **[Agent Profiles](plugins/agent-profiles/README.md)** — Named instruction sets with previewed application and backups.
-- **[MCP Manager](plugins/mcp-manager/README.md)** — Edit Claude Code and Codex MCP server definitions with previews and backups.
+- **[MCP Manager](plugins/mcp-manager/README.md)** — Add, edit, duplicate and remove individual servers; assign supported definitions to Claude Code and Codex with previews and backups.
 - **[Agent Diagnostics](plugins/agent-diagnostics/README.md)** — Read-only checks of instruction paths, file health and configuration syntax.
 - **[Prompt Library](plugins/prompt-library/README.md)** — Searchable local prompts and instruction snippets with tags.
 - **[Config Snapshots](plugins/config-snapshots/README.md)** — Capture and selectively restore supported agent files with change previews.

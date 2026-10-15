@@ -38,7 +38,7 @@
     {
       "id": "mcp-manager",
       "name": "MCP Manager",
-      "description": "Edit Claude Code and Codex MCP server definitions with previews and backups.",
+      "description": "Manage individual MCP servers and assign them to Claude Code and Codex, with previews and backups.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-mcp-manager",
       "homepage": "https://github.com/GoblinRules/ecpa-mcp-manager",

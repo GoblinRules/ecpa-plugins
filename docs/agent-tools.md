@@ -85,7 +85,7 @@ existing ID additionally requires `replace: true`.
 Profiles/Snapshots preview bodies contain `id`, `libraryVersion`, and `selected`
 file IDs. MCP/Skills preview bodies contain `id`, the last-read file `version`, and
 `content`. Only a new, absent skill may use `version: null`. `POST apply` takes
-the returned `token`. MCP/Skills also expose `GET backups?id=...` and
+the returned `token`. MCP Manager also accepts per-server previews with `operation` (`upsert` or `delete`), `source`, `sourceVersion`, `originalName`, `name`, `definition`, `targets` (agent IDs and file versions), and optional `replaceExisting`. It translates supported fields for each target and preserves unrelated entries. Delete is scoped to the source agent. MCP/Skills also expose `GET backups?id=...` and
 `POST restore-preview` with `id`, `version`, and `backup`.
 
 Diagnostics has no mutation routes. Requests cannot choose arbitrary filesystem
