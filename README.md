@@ -25,7 +25,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Interface and artwork
 
-All seven plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors adapt to ECPA’s embedded viewport, with compact headers, wrapping controls, shorter editors, and a compact agent selector in Agent Instructions.
+All seven plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors follow ECPA’s Local Clients layout: charcoal panels, blue accents, persistent left navigation and a spacious editor. Embedded pages retain the sidebar above 650px; phone-sized Instructions views use an agent selector.
 
 Plugin/store metadata publishes HTTPS logo URLs. Current ECPA versions that hardcode puzzle icons need the upstream card-logo UI change to display them; plugin updates cannot change host app buttons or cards. Find in store / Check for updates is also an ECPA app change (PR #458).
 

@@ -132,7 +132,7 @@ MIT license; see [LICENSE](../../LICENSE).
 
 ## v0.4.0 interface update
 
-Agent navigation is grouped into six compact sections with embedded product icons. Codex and Antigravity expose related files within their own group, and narrow layouts use a two-column agent grid. Icons load offline and retain their attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the embedded page source.
+Agent navigation is grouped into six sections with embedded product icons. Codex and Antigravity expose related files within their own group. The ECPA-style left sidebar stays visible above 650px, including short embedded views; narrower screens use an agent selector. Icons load offline and retain their attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the embedded page source.
 
 ## Releases
 

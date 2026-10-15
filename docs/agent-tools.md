@@ -106,8 +106,10 @@ every agent or manage vendor plugin caches.
 
 ## Embedded layout (0.6.1)
 
-The six suite pages share a compact responsive layout. About/help and previous file versions can be expanded as needed; the main editor scales with viewport height. Below 900px, the item list becomes a horizontally scrollable strip. Forms, previews, paths and actions wrap without horizontal page overflow. Agent headings, file targets, diagnostics and change previews use local embedded product icons with friendly names. All seven tools include unique SVG artwork; no icon request is needed to render the editor itself.
+The six suite pages follow ECPA’s Local Clients layout, with charcoal panels and blue selection accents. About/help and previous file versions can be expanded as needed; the main editor scales with viewport height. Left navigation remains beside the editor above 650px, including short embedded views. On narrower screens the item list stacks above the editor as a bounded vertical list. Forms, previews, paths and actions wrap without horizontal page overflow. Agent headings, file targets, diagnostics and change previews use local embedded product icons with friendly names. All seven tools include unique SVG artwork; no icon request is needed to render the editor itself.
 
 Agent Instructions switches to an icon-bearing agent/file selector inside an iframe or a narrow/short viewport. The full grouped navigation remains available on larger standalone pages.
 
 Browser validation covers real-core save/preview/restore workflows and 1000, 820 and 375px iframe widths at 560px height. Use `tests/embedded-layout-check.js` in a same-origin test host containing an unlocked editor iframe to repeat layout checks. Do not run workflow tests against real user files.
+
+`tests/reference-layout.cjs` runs these checks at 560px and 800px heights, verifies that desktop sidebars remain beside the editor, captures screenshots, and runs the existing browser workflows for all seven plugins. It uses Playwright with Edge (`PLAYWRIGHT_MODULE` can point to an installed module) and an isolated same-origin proxy host at `PLUGIN_PREVIEW_URL` (default `http://127.0.0.1:58610`). Screenshots go to `dist/screenshots` or `PLUGIN_SCREENSHOT_DIR`.

@@ -11,6 +11,15 @@
       frame.style.width = width + 'px';
       await new Promise(resolve => setTimeout(resolve, 150));
       if (doc.documentElement.scrollWidth > page.innerWidth) throw Error(`Horizontal overflow at ${width}px`);
+      const sidebar = doc.querySelector('.sidebar');
+      if (width >= 820 && sidebar && !sidebar.closest('[hidden]')) {
+        const nav = sidebar.getBoundingClientRect();
+        const editor = doc.querySelector('.workspace, main.card').getBoundingClientRect();
+        if (!nav.width || nav.right > editor.left || Math.abs(nav.top - editor.top) > 2)
+          throw Error(`Sidebar must remain beside the editor at ${width}px`);
+        const switcher = doc.querySelector('.agent-switch');
+        if (switcher?.getClientRects().length) throw Error('Desktop sidebar replaced by dropdown');
+      }
       for (const image of doc.querySelectorAll('.agent-logo')) {
         if (!image.complete || !image.naturalWidth) throw Error(`Missing agent icon at ${width}px`);
       }

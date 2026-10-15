@@ -1,6 +1,6 @@
 [package]
 name = "agent-skills"
-version = "0.6.2"
+version = "0.6.3"
 repository = "https://github.com/GoblinRules/ecpa-agent-skills"
 edition = "2021"
 license = "MIT"
