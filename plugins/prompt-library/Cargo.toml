@@ -1,6 +1,7 @@
 [package]
 name = "prompt-library"
-version.workspace = true
+version = "0.6.2"
+repository = "https://github.com/GoblinRules/ecpa-prompt-library"
 edition = "2021"
 license = "MIT"
 description = "Searchable local prompts and instruction snippets with tags."

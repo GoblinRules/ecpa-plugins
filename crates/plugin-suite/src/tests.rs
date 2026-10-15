@@ -29,7 +29,13 @@ fn fixture(mode: Mode) -> (tempfile::TempDir, App, Settings) {
             .into_iter()
             .collect(),
     };
-    let mut app = App::new("fixture", "Fixture", mode);
+    let mut app = App::new(
+        "fixture",
+        "Fixture",
+        mode,
+        "9.8.7",
+        "https://github.com/example/fixture",
+    );
     app.settings = Some(settings.clone());
     (dir, app, settings)
 }

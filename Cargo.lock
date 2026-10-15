@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "agent-diagnostics"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -25,7 +25,7 @@ dependencies = [
 
 [[package]]
 name = "agent-instructions"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "agent-files",
  "base64",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "agent-profiles"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "agent-skills"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -82,7 +82,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "config-snapshots"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -226,7 +226,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "mcp-manager"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "prompt-library"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "plugin-suite",
  "serde_json",

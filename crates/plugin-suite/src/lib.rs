@@ -26,15 +26,25 @@ struct Preview {
 pub struct App {
     id: &'static str,
     title: &'static str,
+    version: &'static str,
+    repository: &'static str,
     mode: Mode,
     settings: Option<Settings>,
     preview: Option<Preview>,
 }
 impl App {
-    pub fn new(id: &'static str, title: &'static str, mode: Mode) -> Self {
+    pub fn new(
+        id: &'static str,
+        title: &'static str,
+        mode: Mode,
+        version: &'static str,
+        repository: &'static str,
+    ) -> Self {
         Self {
             id,
             title,
+            version,
+            repository,
             mode,
             settings: None,
             preview: None,
@@ -52,7 +62,7 @@ impl App {
                         return json!({"ok":false,"error":{"code":"invalid_config","message":message}})
                     }
                 }
-                json!({"schema_version":6,"metadata":{"Name":self.title,"Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","Logo":format!("https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/{}.svg",self.id),"GitHubRepository":"https://github.com/GoblinRules/ecpa-plugins","ConfigFields":settings::fields(self.mode)},"capabilities":{"management_api":true}})
+                json!({"schema_version":6,"metadata":{"Name":self.title,"Version":self.version,"Author":"GoblinRules","Logo":format!("https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/{}.svg",self.id),"GitHubRepository":self.repository,"ConfigFields":settings::fields(self.mode)},"capabilities":{"management_api":true}})
             }
             "management.register" => {
                 let routes: Vec<_> = self.routes().iter().map(|(method, path)| json!({"Method":method,"Path":format!("/v0/management/{}/{path}",self.id)})).collect();

@@ -5,7 +5,7 @@ use std::{ffi::{c_char,c_void,CStr},ptr};
 use serde_json::{json,Value};
 fn dispatch(method: &str, raw: &[u8]) -> Value {
     static APP: std::sync::OnceLock<std::sync::Mutex<$crate::App>> = std::sync::OnceLock::new();
-    match APP.get_or_init(|| std::sync::Mutex::new($crate::App::new($id, $title, $crate::Mode::$mode))).lock() {
+    match APP.get_or_init(|| std::sync::Mutex::new($crate::App::new($id, $title, $crate::Mode::$mode, env!("CARGO_PKG_VERSION"), env!("CARGO_PKG_REPOSITORY")))).lock() {
         Ok(mut app) => app.dispatch(method, raw),
         Err(_) => json!({"ok":false,"error":{"code":"plugin_error","message":"Restart the core"}}),
     }

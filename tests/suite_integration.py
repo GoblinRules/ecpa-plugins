@@ -8,6 +8,7 @@ import socket
 import subprocess
 import tempfile
 import time
+import tomllib
 import urllib.error
 import urllib.request
 
@@ -78,6 +79,13 @@ with tempfile.TemporaryDirectory(prefix='ecpa-suite-test-') as folder:
                 time.sleep(.1)
             else:
                 raise RuntimeError((home / 'core.log').read_text(errors='replace'))
+            code, raw = request('/v0/management/plugins')
+            assert code == 200
+            installed = {entry['id']: entry for entry in json.loads(raw)['plugins']}
+            for id in IDS:
+                package = tomllib.loads((ROOT / 'plugins' / id / 'Cargo.toml').read_text())['package']
+                assert installed[id]['metadata']['version'] == package['version'], installed[id]
+                assert installed[id]['metadata']['github_repository'] == package['repository'], installed[id]
             for id in IDS:
                 assert request(f'/v0/management/{id}/state', auth=False)[0] == 401
                 api(id)  # Successful authentication resets the core's failed-attempt counter.

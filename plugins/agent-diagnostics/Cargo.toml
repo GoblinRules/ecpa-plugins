@@ -1,6 +1,7 @@
 [package]
 name = "agent-diagnostics"
-version.workspace = true
+version = "0.6.2"
+repository = "https://github.com/GoblinRules/ecpa-agent-diagnostics"
 edition = "2021"
 license = "MIT"
 description = "Read-only checks of instruction paths, file health and configuration syntax."

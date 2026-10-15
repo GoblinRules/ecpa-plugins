@@ -29,15 +29,29 @@ All seven plugins include distinct vector artwork. Agent-specific controls reuse
 
 Plugin/store metadata publishes HTTPS logo URLs. Current ECPA versions that hardcode puzzle icons need the upstream card-logo UI change to display them; plugin updates cannot change host app buttons or cards. Find in store / Check for updates is also an ECPA app change (PR #458).
 
+## Independent versions
+
+Source and shared libraries stay here. Each plugin has its own public release repository:
+
+- [agent-instructions](https://github.com/GoblinRules/ecpa-agent-instructions/releases)
+- [agent-profiles](https://github.com/GoblinRules/ecpa-agent-profiles/releases)
+- [mcp-manager](https://github.com/GoblinRules/ecpa-mcp-manager/releases)
+- [agent-diagnostics](https://github.com/GoblinRules/ecpa-agent-diagnostics/releases)
+- [prompt-library](https://github.com/GoblinRules/ecpa-prompt-library/releases)
+- [config-snapshots](https://github.com/GoblinRules/ecpa-config-snapshots/releases)
+- [agent-skills](https://github.com/GoblinRules/ecpa-agent-skills/releases)
+
+The migration uses 0.6.2 once for all seven to preserve upgrades from 0.6.1. Future releases advance independently. Your registry URL and saved configuration stay the same.
+
 ## Repository layout
 
 ```text
 registry.json                     Public store catalogue (stable URL)
-Cargo.toml / Cargo.lock            Shared Rust workspace and version
+Cargo.toml / Cargo.lock            Shared Rust workspace and locked dependencies
 plugins/
   agent-instructions/
     README.md                     Installation, usage, limitations, API
-    Cargo.toml                    Plugin package
+    Cargo.toml                    Independent version and release repository
     src/                          Native plugin and file storage
     web/                          Embedded editor
     tests/                        Core integration and browser checks
@@ -46,6 +60,7 @@ crates/agent-files/               Shared file protections and instruction paths
 crates/plugin-suite/              Shared native bridge, workflows and UI
 tests/                            Isolated suite integration/browser checks
 scripts/                          Shared validation and release packaging
+distribution/                     Release-repository templates
 docs/                             Development and release guidance
 .github/workflows/                CI and publication
 assets/                           Repository artwork
@@ -64,6 +79,6 @@ cargo test --workspace --locked
 python scripts/package.py
 ```
 
-See [adding a plugin](docs/adding-plugins.md) and [release process](docs/releases.md). Each plugin owns its implementation, documentation and tests. Shared tooling builds all registered plugins together because the store resolves this repository's latest release.
+See [adding a plugin](docs/adding-plugins.md) and [release process](docs/releases.md). Each plugin owns its implementation, documentation and tests. Each plugin has its own release repository and version. Build one with `python scripts/package.py --plugin <id>`. See [release repository structure](distribution/README.md).
 
 MIT license; see [LICENSE](LICENSE).

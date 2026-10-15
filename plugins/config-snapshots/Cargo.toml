@@ -1,6 +1,7 @@
 [package]
 name = "config-snapshots"
-version.workspace = true
+version = "0.6.2"
+repository = "https://github.com/GoblinRules/ecpa-config-snapshots"
 edition = "2021"
 license = "MIT"
 description = "Capture and selectively restore supported agent files with change previews."

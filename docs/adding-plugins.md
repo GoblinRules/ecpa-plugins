@@ -1,15 +1,12 @@
 # Adding a plugin
 
-1. Create `plugins/<plugin-id>/` with `Cargo.toml`, `src/`, `tests/`, and a README. Add `web/`, `assets/`, or `scripts/` only when needed.
-2. Match the Cargo package name to the registry ID. Use `version.workspace = true` and a library with `crate-type = ["cdylib", "rlib"]`. The `plugins/*` workspace discovers it automatically. Use the default library name (package ID with hyphens changed to underscores).
-3. Implement the CLIProxyAPI native ABI and declare only capabilities the plugin uses. Keep private file/data endpoints behind authenticated management routes.
-4. Add a `registry.json` entry with its ID, name, description, author and this repository URL. Include license and useful tags. Do not add placeholder entries for unimplemented plugins.
-5. Document purpose, supported platforms, requirements, configuration, authentication, data locations, limitations, test commands and upgrade behaviour in the plugin README. Add it to the root catalogue.
-6. Add tests with isolated fixture data. Do not use personal agent files, credentials, or installed production cores as test fixtures.
-7. Run root validation, Rust checks, and packaging. The shared release tool packages every registry entry and generates one checksums file.
+1. Create `plugins/<plugin-id>/` with Cargo.toml, src, tests and README. Keep shared code/artwork in crates and assets.
+2. Match the package name to the registry ID. Set explicit `version = "0.1.0"` and `repository = "https://github.com/GoblinRules/ecpa-<plugin-id>"`. Use cdylib and rlib crate types with the default library name. The plugins/* workspace discovers it automatically.
+3. Implement the native ABI and only required capabilities. Authenticate private data endpoints. The suite macro passes the calling plugin's version and repository into shared runtime code.
+4. Add a registry entry with matching release repository, ID, name, description, author, license, tags and artwork. Each plugin needs a distinct release repository.
+5. Generate its README, license, identity and workflow with `python scripts/prepare-release-repo.py --plugin <id> --output <empty-directory>`. Create a public repository and push those files. Keep implementation source here.
+6. Document usage, platforms, configuration, authentication, data paths, limits, tests and upgrades in the plugin README. Link it from the root catalogue.
+7. Add isolated fixture tests. Run validation, Rust checks and relevant integration/browser tests. Build only this plugin with `python scripts/package.py --plugin <id>`.
+8. Publish and verify its first release before publishing the registry change on master. See [releases](releases.md).
 
-All current plugins are Rust native libraries distributed for Windows x64. A plugin written in another language needs an explicit shared build adapter and CI support before it can be added. Do not list unsupported platforms as downloadable.
-
-The registry supports entries pointing to other repositories, but this collection's validator deliberately requires local entries to point here. Independently versioned plugins should use a separate release repository and a corresponding update to the validator/tooling.
-
-Shared library crates belong under `crates/` and do not need registry entries. The six agent-tool plugins use `plugin-suite::export_plugin!` with a workflow mode; independent workflows can implement their own native dispatch. Keep plugin-specific documentation and point to shared tests when behavior is intentionally shared.
+Current binaries target Windows x64. Non-Rust plugins need a build adapter and CI support. Shared crates are not installable plugins and do not get registry entries or release repositories.

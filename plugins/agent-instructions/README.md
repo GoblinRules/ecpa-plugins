@@ -116,7 +116,7 @@ Version tokens are opaque and bind the resolved path and content, including for 
 
 ## Repository and releases
 
-Source: `plugins/agent-instructions/`. Shared build commands run from the repository root; this plugin inherits the collection version. See [release process](../../docs/releases.md) and [adding plugins](../../docs/adding-plugins.md). The registry URL remains unchanged.
+Source: `plugins/agent-instructions/`. Shared build commands run from the repository root; this plugin owns its version in Cargo.toml. See [release process](../../docs/releases.md) and [adding plugins](../../docs/adding-plugins.md). The registry URL remains unchanged.
 
 ## References
 
@@ -133,3 +133,7 @@ MIT license; see [LICENSE](../../LICENSE).
 ## v0.4.0 interface update
 
 Agent navigation is grouped into six compact sections with embedded product icons. Codex and Antigravity expose related files within their own group, and narrow layouts use a two-column agent grid. Icons load offline and retain their attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the embedded page source.
+
+## Releases
+
+Binaries and per-plugin releases: [ecpa-agent-instructions](https://github.com/GoblinRules/ecpa-agent-instructions). Source and shared code remain in this workspace. See [independent releases](../../docs/releases.md).

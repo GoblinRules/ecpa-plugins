@@ -33,4 +33,8 @@ python scripts/package.py
 python tests/suite_integration.py --core C:/path/to/cli-proxy-api.exe
 ```
 
-The isolated core test covers this plugin's real DLL and authenticated routes. Add `--serve`, open this plugin's `/v0/resource/plugins/prompt-library/editor` page, and evaluate `tests/suite-browser-check.js` for its UI workflow. Do not run fixture tests against personal files. Releases share the collection version and are installed through the same registry URL.
+The isolated core test covers this plugin's real DLL and authenticated routes. Add `--serve`, open this plugin's `/v0/resource/plugins/prompt-library/editor` page, and evaluate `tests/suite-browser-check.js` for its UI workflow. Do not run fixture tests against personal files. This plugin has its own version and release repository; the shared registry URL stays unchanged.
+
+## Releases
+
+Binaries and per-plugin releases: [ecpa-prompt-library](https://github.com/GoblinRules/ecpa-prompt-library). Source and shared code remain in this workspace. See [independent releases](../../docs/releases.md).

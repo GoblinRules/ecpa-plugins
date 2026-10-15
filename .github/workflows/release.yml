@@ -1,38 +1,28 @@
-name: Publish plugin release
+name: Build selected plugin
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: 'Plugin ID, e.g. mcp-manager'
+        required: true
 permissions:
   contents: read
 jobs:
-  release:
+  build:
     runs-on: windows-latest
-    permissions:
-      contents: write
+    env:
+      PLUGIN_ID: ${{ inputs.plugin }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check tag matches package version
-        run: python -c "import os,tomllib; assert os.environ['GITHUB_REF_NAME'] == 'v'+tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version']"
       - run: python scripts/validate.py
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
-      - run: python scripts/package.py
-      - name: Publish Windows package and checksums
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Build selected package
         shell: pwsh
-        run: |
-          gh release view $env:GITHUB_REF_NAME *> $null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Output "Release already exists; preserving published assets."
-            exit 0
-          }
-          $assets = @(Get-ChildItem dist -File | ForEach-Object FullName)
-          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --title "ECPA Plugins $env:GITHUB_REF_NAME" --generate-notes
+        run: python scripts/package.py --plugin $env:PLUGIN_ID
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selected-plugin-windows-amd64
+          path: dist/**
