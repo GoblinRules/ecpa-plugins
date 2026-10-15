@@ -1,0 +1,18 @@
+[package]
+name = "agent-instructions"
+version = "0.3.0"
+edition = "2021"
+license = "MIT"
+description = "Claude and Codex global instruction editor for CLIProxyAPI"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+base64 = "0.22"
+dirs = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+

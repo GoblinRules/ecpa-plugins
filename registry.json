@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "agent-instructions",
+      "name": "Agent Instructions",
+      "description": "Edit global instructions for Claude Code, Codex, Kimi Code, Grok Build, ZCode and Antigravity with backups, restore, conflict detection and optional remembered login.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-plugins",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins",
+      "license": "MIT",
+      "tags": ["Management", "Instructions", "Claude", "Codex", "Kimi", "Grok", "ZCode", "Antigravity"]
+    }
+  ]
+}
