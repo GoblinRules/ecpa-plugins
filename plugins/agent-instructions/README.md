@@ -107,3 +107,8 @@ Source: `plugins/agent-instructions/`. Shared build commands run from the reposi
 - [Antigravity rules](https://antigravity.google/docs/rules/)
 
 MIT license; see [LICENSE](../../LICENSE).
+
+
+## v0.4.0 interface update
+
+Agent navigation is grouped into six compact sections with embedded product icons. Codex and Antigravity expose related files within their own group, and narrow layouts use a two-column agent grid. Icons load offline and retain their attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the embedded page source.
