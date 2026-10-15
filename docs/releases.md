@@ -34,3 +34,7 @@ Historical versions through 0.6.1 remain in the central repository unchanged. Al
 Plugin IDs, the registry URL, configuration, data directories and backups stay unchanged. Refresh the existing store source, update, then restart the core if prompted. Do not reset published 0.6.1 plugins to 0.1.0: that would appear as a downgrade.
 
 Stage migration on a branch. Publish and verify all dedicated repositories before fast-forwarding master and switching the stable registry to them.
+
+### Migration regression check
+
+`tests/store_migration.py --core <isolated-core-executable> --registry <published-registry-url>` copies archived 0.6.1 ZIPs from dist into a temporary core, checks all seven store upgrade offers, installs the new releases, verifies configuration preservation, restarts, and checks loaded metadata. It requires the historical ZIPs in dist and network access; it is a manual migration check, not part of offline CI. It never uses the installed production core or personal agent files.
