@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix="agent-instructions-test-") as temp:
     temp = Path(temp)
     plugins = temp / "plugins"
     plugins.mkdir()
-    shutil.copy2(root / "target/release/agent_instructions.dll", plugins / "agent-instructions.dll")
+    shutil.copy2(root.parents[1] / "target/release/agent_instructions.dll", plugins / "agent-instructions.dll")
     claude, codex = temp / "claude", temp / "codex"
     claude.mkdir()
     codex.mkdir()
