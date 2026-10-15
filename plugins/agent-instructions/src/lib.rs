@@ -1,3 +1,4 @@
+mod config;
 mod storage;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
@@ -9,7 +10,7 @@ use std::{
 
 const API: &str = "/v0/management/agent-instructions";
 const PAGE: &str = "/v0/resource/plugins/agent-instructions/editor";
-static IO_LOCK: Mutex<()> = Mutex::new(());
+static IO_LOCK: Mutex<config::Paths> = Mutex::new(config::Paths::new());
 
 #[repr(C)]
 pub struct Buffer {
@@ -100,10 +101,24 @@ unsafe extern "C" fn shutdown() {}
 
 fn dispatch(method: &str, raw: &[u8]) -> Value {
     let result = match method {
-        "plugin.register" | "plugin.reconfigure" => json!({"schema_version": 6,
-            "metadata": {"Name": "Agent Instructions", "Version": env!("CARGO_PKG_VERSION"), "Author": "GoblinRules",
-                "GitHubRepository": "https://github.com/GoblinRules/ecpa-plugins", "ConfigFields": []},
-            "capabilities": {"management_api": true}}),
+        "plugin.register" | "plugin.reconfigure" => {
+            let paths = match config::parse(raw) {
+                Ok(paths) => paths,
+                Err(message) => {
+                    return json!({"ok": false, "error": {"code": "invalid_config", "message": message}})
+                }
+            };
+            match IO_LOCK.lock() {
+                Ok(mut current) => *current = paths,
+                Err(_) => {
+                    return json!({"ok": false, "error": {"code": "plugin_error", "message": "Restart the proxy"}})
+                }
+            }
+            json!({"schema_version": 6,
+                "metadata": {"Name": "Agent Instructions", "Version": env!("CARGO_PKG_VERSION"), "Author": "GoblinRules",
+                    "GitHubRepository": "https://github.com/GoblinRules/ecpa-plugins", "ConfigFields": config::fields()},
+                "capabilities": {"management_api": true}})
+        }
         "management.register" => {
             json!({"resources": [{"Path": "/editor", "Menu": "Agent Instructions", "Description": "Edit global agent instructions"}],
             "routes": [
@@ -169,7 +184,7 @@ fn handle(req: &Value) -> Value {
         let _lock = IO_LOCK
             .lock()
             .map_err(|_| (500, "File service unavailable; restart the proxy".into()))?;
-        let store = storage::Store::discover()?;
+        let store = storage::Store::discover(_lock.clone())?;
         if method == "GET" {
             return if path.ends_with("/files") {
                 store.list()
@@ -206,6 +221,32 @@ fn handle(req: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn lifecycle_publishes_fields_and_rejects_invalid_reconfiguration() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("rules.md");
+        let raw =
+            json!({"config_yaml": STANDARD.encode(json!({"claude_path": target}).to_string())})
+                .to_string();
+        let registered = dispatch("plugin.register", raw.as_bytes());
+        assert_eq!(registered["ok"], true);
+        assert_eq!(
+            registered["result"]["metadata"]["ConfigFields"]
+                .as_array()
+                .unwrap()
+                .len(),
+            8
+        );
+        let invalid =
+            json!({"config_yaml": STANDARD.encode("claude_path: relative.md")}).to_string();
+        assert_eq!(
+            dispatch("plugin.reconfigure", invalid.as_bytes())["ok"],
+            false
+        );
+        assert_eq!(IO_LOCK.lock().unwrap().get("claude"), Some(&target));
+        assert_eq!(dispatch("plugin.reconfigure", b"{}")["ok"], true);
+        assert!(IO_LOCK.lock().unwrap().is_empty());
+    }
     #[test]
     fn public_page_cannot_access_files() {
         let page = handle(&json!({"Method": "GET", "Path": PAGE, "Query": {"id": ["claude"]}}));

@@ -19,13 +19,14 @@ fn hash(bytes: &[u8]) -> String {
 }
 
 pub struct Store {
+    pub overrides: crate::config::Paths,
     pub claude: PathBuf,
     pub codex: PathBuf,
     pub home: PathBuf,
     pub kimi: PathBuf,
 }
 impl Store {
-    pub fn discover() -> Result<Self> {
+    pub fn discover(overrides: crate::config::Paths) -> Result<Self> {
         // Explicit plugin-level override supports portable profiles and isolated tests.
         let home = std::env::var_os("AGENT_INSTRUCTIONS_HOME")
             .filter(|v| !v.is_empty())
@@ -48,6 +49,7 @@ impl Store {
             Ok(p)
         };
         Ok(Self {
+            overrides,
             claude: env_path("CLAUDE_CONFIG_DIR", home.join(".claude"))?,
             codex: env_path("CODEX_HOME", home.join(".codex"))?,
             kimi: env_path("KIMI_CODE_HOME", home.join(".kimi-code"))?,
@@ -55,6 +57,9 @@ impl Store {
         })
     }
     fn path(&self, id: &str) -> Result<PathBuf> {
+        if let Some(path) = self.overrides.get(id) {
+            return Ok(path.clone());
+        }
         match id {
             "claude" => Ok(self.claude.join("CLAUDE.md")),
             "codex" => Ok(self.codex.join("AGENTS.md")),
@@ -94,7 +99,7 @@ impl Store {
             .is_some_and(|b| !String::from_utf8_lossy(&b).trim().is_empty());
         Ok(
             json!({"id": id, "path": p, "exists": bytes.is_some(), "content": content,
-            "version": version(bytes.as_deref()), "overrideActive": override_active, "precedenceWarning": precedence_warning}),
+            "version": version(&p, bytes.as_deref()), "overrideActive": override_active, "precedenceWarning": precedence_warning}),
         )
     }
     pub fn list(&self) -> Result<Value> {
@@ -155,10 +160,11 @@ impl Store {
         }
         let p = self.path(id)?;
         let before = read_file(&p)?;
-        if version(before.as_deref()) != expected {
+        if version(&p, before.as_deref()) != expected {
             return Err((
                 409,
-                "File changed on disk. Copy your draft, then reload before saving.".into(),
+                "File or configured location changed. Copy your draft, then reload before saving."
+                    .into(),
             ));
         }
         let mut data = content.to_vec();
@@ -201,7 +207,7 @@ impl Store {
                 .map_err(io)?;
         }
         tmp.as_file().sync_all().map_err(io)?;
-        if version(read_file(&p)?.as_deref()) != expected {
+        if version(&p, read_file(&p)?.as_deref()) != expected {
             return Err((
                 409,
                 "File changed while saving; your draft has not been written".into(),
@@ -226,8 +232,17 @@ impl Store {
 fn valid_backup(s: &str) -> bool {
     s.len() == 67 && s.ends_with(".md") && s.as_bytes()[..64].iter().all(|b| b.is_ascii_hexdigit())
 }
-fn version(b: Option<&[u8]>) -> String {
-    b.map(hash).unwrap_or_else(|| "missing".into())
+fn version(path: &Path, b: Option<&[u8]>) -> String {
+    // Bind even a missing/empty file to its location, preventing stale drafts
+    // from being written to a newly configured target with identical contents.
+    hash(
+        format!(
+            "{}\0{}",
+            path.display(),
+            b.map(hash).unwrap_or_else(|| "missing".into())
+        )
+        .as_bytes(),
+    )
 }
 fn check_links(p: &Path) -> Result<()> {
     for ancestor in p.ancestors() {
@@ -276,6 +291,7 @@ mod tests {
     fn setup() -> (tempfile::TempDir, Store) {
         let d = tempfile::tempdir().unwrap();
         let s = Store {
+            overrides: crate::config::Paths::new(),
             claude: d.path().join("claude"),
             codex: d.path().join("codex"),
             home: d.path().to_path_buf(),
@@ -286,7 +302,13 @@ mod tests {
     #[test]
     fn create_conflict_backup_restore() {
         let (_d, s) = setup();
-        let first = s.save("claude", "missing", "original\r\n").unwrap();
+        let first = s
+            .save(
+                "claude",
+                s.read("claude").unwrap()["version"].as_str().unwrap(),
+                "original\r\n",
+            )
+            .unwrap();
         assert_eq!(s.save("claude", "missing", "bad").unwrap_err().0, 409);
         let second = s
             .save("claude", first["version"].as_str().unwrap(), "edited\n")
@@ -310,9 +332,33 @@ mod tests {
         );
     }
     #[test]
+    fn changing_missing_target_rejects_stale_save() {
+        let (d, mut s) = setup();
+        let before = s.read("claude").unwrap();
+        let target = d.path().join("alternate/rules.md");
+        s.overrides.insert("claude".into(), target.clone());
+        assert_eq!(
+            s.save("claude", before["version"].as_str().unwrap(), "stale")
+                .unwrap_err()
+                .0,
+            409
+        );
+        assert!(!target.exists());
+        let current = s.read("claude").unwrap();
+        s.save("claude", current["version"].as_str().unwrap(), "custom")
+            .unwrap();
+        assert_eq!(fs::read_to_string(target).unwrap(), "custom");
+    }
+    #[test]
     fn external_edit_and_missing_are_distinct() {
         let (_d, s) = setup();
-        let v = s.save("codex", "missing", "").unwrap();
+        let v = s
+            .save(
+                "codex",
+                s.read("codex").unwrap()["version"].as_str().unwrap(),
+                "",
+            )
+            .unwrap();
         fs::write(s.path("codex").unwrap(), "external").unwrap();
         assert_eq!(
             s.save("codex", v["version"].as_str().unwrap(), "draft")
@@ -329,14 +375,30 @@ mod tests {
     fn reject_paths_large_files_and_corrupt_backups() {
         let (_d, s) = setup();
         assert!(s.read("../secret").is_err());
-        assert!(s.restore("claude", "missing", "../../secret").is_err());
+        assert!(s
+            .restore(
+                "claude",
+                s.read("claude").unwrap()["version"].as_str().unwrap(),
+                "../../secret"
+            )
+            .is_err());
         assert_eq!(
-            s.save("claude", "missing", &"x".repeat(LIMIT + 1))
-                .unwrap_err()
-                .0,
+            s.save(
+                "claude",
+                s.read("claude").unwrap()["version"].as_str().unwrap(),
+                &"x".repeat(LIMIT + 1)
+            )
+            .unwrap_err()
+            .0,
             413
         );
-        let v = s.save("claude", "missing", "a").unwrap();
+        let v = s
+            .save(
+                "claude",
+                s.read("claude").unwrap()["version"].as_str().unwrap(),
+                "a",
+            )
+            .unwrap();
         s.save("claude", v["version"].as_str().unwrap(), "b")
             .unwrap();
         let b = s.backups("claude").unwrap();
@@ -347,7 +409,14 @@ mod tests {
     #[test]
     fn override_and_invalid_utf8() {
         let (_d, s) = setup();
-        s.save("codex-override", "missing", "rules").unwrap();
+        s.save(
+            "codex-override",
+            s.read("codex-override").unwrap()["version"]
+                .as_str()
+                .unwrap(),
+            "rules",
+        )
+        .unwrap();
         assert_eq!(s.read("codex").unwrap()["overrideActive"], true);
         fs::create_dir_all(&s.claude).unwrap();
         fs::write(s.path("claude").unwrap(), [255]).unwrap();
@@ -359,7 +428,13 @@ mod tests {
         let (_d, s) = setup();
         fs::create_dir_all(s.path("codex-override").unwrap()).unwrap();
         assert!(s.read("claude").is_ok());
-        let saved = s.save("codex", "missing", "rules").unwrap();
+        let saved = s
+            .save(
+                "codex",
+                s.read("codex").unwrap()["version"].as_str().unwrap(),
+                "rules",
+            )
+            .unwrap();
         assert!(saved["precedenceWarning"].is_string());
         assert!(!valid_backup(&format!("{}é.md", "a".repeat(62))));
     }

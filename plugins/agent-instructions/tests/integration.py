@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix="agent-instructions-test-") as temp:
             for id, relative in [("kimi", "kimi-code/AGENTS.md"), ("grok", ".grok/AGENTS.md"), ("zcode", ".zcode/AGENTS.md"), ("antigravity", ".gemini/GEMINI.md"), ("antigravity-agents", ".gemini/AGENTS.md")]:
                 file = next(f for f in listing if f["id"] == id)
                 assert Path(file["path"]) == temp / relative, (id, file["path"])
-                created = api("/file", "PUT", {"id": id, "version": "missing", "content": "# Original " + id})
+                created = api("/file", "PUT", {"id": id, "version": file["version"], "content": "# Original " + id})
                 changed_new = api("/file", "PUT", {"id": id, "version": created["version"], "content": "Updated"})
                 api("/file", "PUT", {"id": id, "version": created["version"], "content": "Stale"}, 409)
                 backup = api("/backups?id=" + id)["backups"][0]["name"]
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix="agent-instructions-test-") as temp:
             assert restored["content"] == first["content"]
             api("/file", "PUT", {"id": "../config.yaml", "version": "missing", "content": "bad"}, 400)
             api("/restore", "POST", {"id": "claude", "version": restored["version"], "backup": "../../config.yaml"}, 400)
-            override = api("/file", "PUT", {"id": "codex-override", "version": "missing", "content": "Temporary rules"})
+            override = api("/file", "PUT", {"id": "codex-override", "version": next(f for f in listing if f["id"] == "codex-override")["version"], "content": "Temporary rules"})
             assert override["overrideActive"]
             cleared = api("/file", "PUT", {"id": "codex-override", "version": override["version"], "content": ""})
             assert not cleared["overrideActive"]
@@ -115,6 +115,37 @@ with tempfile.TemporaryDirectory(prefix="agent-instructions-test-") as temp:
             api("/file", "PUT", {"id": "claude", "version": restored["version"], "content": "stale"}, 409)
             assert (claude / "CLAUDE.md").read_text() == "External edit"
             (claude / "CLAUDE.md").write_bytes(first["content"].encode())
+            # Configuration uses the same authenticated endpoint as ECPA's Configure dialog.
+            config_api = "/v0/management/plugins/agent-instructions/config"
+            custom = temp / "nonstandard folder" / "custom rules.md"
+            custom.parent.mkdir()
+            custom.write_bytes(first["content"].encode())
+            stale = api("/files")["files"][0]
+            code, raw = request(config_api, "PATCH", {"claude_path": str(custom)})
+            assert code == 200, (code, raw)
+            for _ in range(100):
+                current = api("/files")["files"][0]
+                if Path(current["path"]) == custom:
+                    break
+                time.sleep(.1)
+            assert Path(current["path"]) == custom, current
+            assert current["content"] == stale["content"]
+            api("/file", "PUT", {"id": "claude", "version": stale["version"], "content": "wrong target"}, 409)
+            saved_custom = api("/file", "PUT", {"id": "claude", "version": current["version"], "content": "Custom location"})
+            assert custom.read_text() == saved_custom["content"]
+            assert (claude / "CLAUDE.md").read_bytes() == first["content"].encode()
+            backup = api("/backups?id=claude")["backups"][0]["name"]
+            api("/restore", "POST", {"id": "claude", "version": saved_custom["version"], "backup": backup})
+            assert custom.read_bytes() == first["content"].encode()
+            code, raw = request(config_api, "PATCH", {"claude_path": ""})
+            assert code == 200, (code, raw)
+            for _ in range(100):
+                current = api("/files")["files"][0]
+                if Path(current["path"]) == claude / "CLAUDE.md":
+                    break
+                time.sleep(.1)
+            assert Path(current["path"]) == claude / "CLAUDE.md"
+            print("PASS: live path reconfiguration, stale-target rejection, custom backups/restore, blank reset", flush=True)
             print("PASS: real-core loading, authentication, exact Markdown round trip, save, conflict, backup, restore, allowlist, override", flush=True)
             if args.serve:
                 print(f"PREVIEW_URL={base}/v0/resource/plugins/agent-instructions/editor", flush=True)

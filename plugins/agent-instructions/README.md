@@ -43,11 +43,32 @@ Paths below are relative to the **proxy user's home**, on the machine running th
 
 Environment overrides must be absolute paths and present in the **core process** environment. The plugin-specific `AGENT_INSTRUCTIONS_HOME` overrides its base home for portable profiles and tests; agent-specific overrides take precedence. It does not change which files the agents themselves load.
 
-A non-empty Codex override replaces its global AGENTS.md. Clear the override to fall back. Start a new agent session after saving. Project files, modular rules, and Antigravity's alternate `.gemini/config` files are not edited by this version. No files are created until Save.
+### Custom file locations
+
+Open **Plugins > Agent Instructions > Configure**. Set an optional field to an **absolute file path including its filename**, save configuration, and reload the editor. Leave a field blank to restore its default/environment-based location.
+
+| Configuration field | Instruction file |
+| --- | --- |
+| `claude_path` | Claude Code CLAUDE.md |
+| `codex_path` | Codex AGENTS.md |
+| `codex_override_path` | Codex AGENTS.override.md |
+| `kimi_path` | Kimi Code AGENTS.md |
+| `grok_path` | Grok Build AGENTS.md |
+| `zcode_path` | Z.ai / ZCode AGENTS.md |
+| `antigravity_path` | Antigravity GEMINI.md |
+| `antigravity_agents_path` | Antigravity AGENTS.md |
+
+For example, enter `D:\Agent Rules\CLAUDE.md` directly in Configure. Paths refer to the **machine running the core**, not the browser device. Relative paths, `~`, and environment-variable expressions are not expanded. Missing parent directories are created on first save. Existing directories are rejected as file targets.
+
+Overrides take precedence over environment-based defaults. They only choose which files this editor opens: configure the agent separately to load those files. Existing files and backups are **not moved**. Backups stay beside their target; switching back to a previous location makes its backups available again. An editor opened before a location change receives a conflict when saving to the new target, even with identical contents. Copy any draft before reloading.
+
+For YAML configuration, add these fields under `plugins.configs.agent-instructions`, for example `claude_path: 'D:\Agent Rules\CLAUDE.md'` (single quotes preserve Windows backslashes).
+
+A non-empty Codex override replaces its global AGENTS.md. Clear the override to fall back. Start a new agent session after saving. The default locations cover global files; use an explicit override for an alternate location. No files are created until Save.
 
 Backups live in `.agent-instructions-backups/<file-id>/<sha256>.md` under the corresponding file's parent. Identical previous versions are deduplicated; backups are not automatically pruned. Restore backs up the current content before replacing it. First creation has no previous content to back up.
 
-Only the eight named files are allowed. Linked files/directories (including Windows junctions), invalid UTF-8, and oversized files are rejected. Atomic writes preserve ordinary permissions but do not explicitly copy custom Windows ACLs or alternate streams. Content is checked before saving and again before replacement; a narrow race with unrelated external editors remains.
+Only the eight configured file slots are allowed; file API requests cannot supply arbitrary paths. Linked files/directories (including Windows junctions), invalid UTF-8, and oversized files are rejected. Atomic writes preserve ordinary permissions but do not explicitly copy custom Windows ACLs or alternate streams. Content is checked before saving and again before replacement; a narrow race with unrelated external editors remains.
 
 ## Manual installation / upgrading
 
@@ -89,9 +110,9 @@ PUT  /v0/management/agent-instructions/file
 POST /v0/management/agent-instructions/restore
 ```
 
-Save body: `{ "id": "claude", "version": "<last-read hash or missing>", "content": "..." }`.
-Restore body: `{ "id": "claude", "version": "<last-read hash>", "backup": "<hash>.md" }`.
-Conflicts return HTTP 409 and retain the editor draft. Authentication is enforced by the core. Native plugins share its process and origin trust boundary. The editor has no CDN dependencies or telemetry; instruction content is displayed as text.
+Save body: `{ "id": "claude", "version": "<last-read version>", "content": "..." }`.
+Restore body: `{ "id": "claude", "version": "<last-read version>", "backup": "<hash>.md" }`.
+Version tokens are opaque and bind the resolved path and content, including for missing files. Always use the token returned by `/files`. Conflicts return HTTP 409 and retain the editor draft. Authentication is enforced by the core. Native plugins share its process and origin trust boundary. The editor has no CDN dependencies or telemetry; instruction content is displayed as text.
 
 ## Repository and releases
 
