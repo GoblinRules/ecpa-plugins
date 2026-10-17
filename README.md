@@ -69,6 +69,9 @@ dist/                             Generated release ZIPs (not committed)
 
 ## Development
 
+See the [2026-10-17 compatibility review](docs/compatibility.md) for the updated
+plugin contract, lifecycle handling and real-core verification on CLIProxyAPI v8.0.32.
+
 Requires Rust stable, a native linker, and Python 3.11+.
 
 ```powershell

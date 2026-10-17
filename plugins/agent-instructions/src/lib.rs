@@ -96,10 +96,25 @@ unsafe extern "C" fn free(p: *mut c_void, len: usize) {
         )));
     }
 }
-unsafe extern "C" fn shutdown() {}
+unsafe extern "C" fn shutdown() {
+    let _ = std::panic::catch_unwind(|| dispatch("plugin.shutdown", b"{}"));
+}
 
 fn dispatch(method: &str, raw: &[u8]) -> Value {
     let result = match method {
+        // File operations are synchronous and serialized by IO_LOCK. Acquiring
+        // it drains any active operation before acknowledging the lifecycle call.
+        "plugin.quiesce" | "plugin.shutdown" => match IO_LOCK.lock() {
+            Ok(mut paths) => {
+                if method == "plugin.shutdown" {
+                    *paths = config::Paths::new();
+                }
+                json!({})
+            }
+            Err(_) => {
+                return json!({"ok": false, "error": {"code": "plugin_error", "message": "Restart the proxy"}})
+            }
+        },
         "plugin.register" | "plugin.reconfigure" => {
             let paths = match config::parse(raw) {
                 Ok(paths) => paths,
@@ -230,6 +245,9 @@ mod tests {
                 .to_string();
         let registered = dispatch("plugin.register", raw.as_bytes());
         assert_eq!(registered["ok"], true);
+        assert_eq!(registered["result"]["schema_version"], 6);
+        assert_eq!(dispatch("plugin.quiesce", b"{}")["ok"], true);
+        assert_eq!(IO_LOCK.lock().unwrap().get("claude"), Some(&target));
         assert_eq!(
             registered["result"]["metadata"]["ConfigFields"]
                 .as_array()
@@ -246,6 +264,10 @@ mod tests {
         assert_eq!(IO_LOCK.lock().unwrap().get("claude"), Some(&target));
         assert_eq!(dispatch("plugin.reconfigure", b"{}")["ok"], true);
         assert!(IO_LOCK.lock().unwrap().is_empty());
+        assert_eq!(dispatch("plugin.register", raw.as_bytes())["ok"], true);
+        assert_eq!(dispatch("plugin.shutdown", b"{}")["ok"], true);
+        assert!(IO_LOCK.lock().unwrap().is_empty());
+        assert_eq!(dispatch("plugin.shutdown", b"{}")["ok"], true);
     }
     #[test]
     fn public_page_cannot_access_files() {

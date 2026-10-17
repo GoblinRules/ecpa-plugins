@@ -145,6 +145,13 @@ with tempfile.TemporaryDirectory(prefix="agent-instructions-test-") as temp:
                     break
                 time.sleep(.1)
             assert Path(current["path"]) == claude / "CLAUDE.md"
+            if not args.serve:
+                code, raw = request('/v0/management/plugins/agent-instructions', 'DELETE')
+                assert code == 200, (code, raw)
+                assert not (plugins / 'agent-instructions.dll').exists()
+                assert request('/v0/management/agent-instructions/files')[0] == 404
+                assert process.poll() is None
+                print('PASS: targeted instruction-plugin unload keeps the core running', flush=True)
             print("PASS: live path reconfiguration, stale-target rejection, custom backups/restore, blank reset", flush=True)
             print("PASS: real-core loading, authentication, exact Markdown round trip, save, conflict, backup, restore, allowlist, override", flush=True)
             if args.serve:

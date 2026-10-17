@@ -95,7 +95,9 @@ unsafe extern "C" fn free(p: *mut c_void, len: usize) {
         )));
     }
 }
-unsafe extern "C" fn shutdown() {}
+unsafe extern "C" fn shutdown() {
+    let _ = std::panic::catch_unwind(|| dispatch("plugin.shutdown", b"{}"));
+}
 
 
 };

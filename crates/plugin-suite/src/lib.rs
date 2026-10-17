@@ -53,6 +53,17 @@ impl App {
     }
     pub fn dispatch(&mut self, method: &str, raw: &[u8]) -> Value {
         let result = match method {
+            // All work is synchronous under the ABI mutex; there are no background
+            // workers to drain. Do not retain a write confirmation across unload.
+            "plugin.quiesce" => {
+                self.preview = None;
+                json!({})
+            }
+            "plugin.shutdown" => {
+                self.preview = None;
+                self.settings = None;
+                json!({})
+            }
             "plugin.register" | "plugin.reconfigure" => {
                 match Settings::parse(raw, self.id) {
                     Ok(settings) => {

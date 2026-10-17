@@ -155,6 +155,15 @@ with tempfile.TemporaryDirectory(prefix='ecpa-suite-test-') as folder:
             apply('agent-skills', api('agent-skills', 'preview', 'POST', {'id': 'codex/review', 'version': None, 'content': content}))
             assert (home / '.agents/skills/review/SKILL.md').read_text() == content
             assert api('agent-skills')['files'][0]['content'] == content
+            if not args.serve:
+                # Exercise the host's actual quiesce/shutdown/unload path, not
+                # just process termination. Other loaded plugins must survive.
+                code, raw = request('/v0/management/plugins/prompt-library', 'DELETE')
+                assert code == 200, (code, raw)
+                assert not (plugins / 'prompt-library.dll').exists()
+                assert request('/v0/management/prompt-library/state')[0] == 404
+                assert api('agent-skills')['files'][0]['content'] == content
+                print('PASS: targeted plugin unload leaves other plugins running', flush=True)
             print('PASS: six DLLs, authentication, profiles, batch conflicts, MCP preservation and restore, diagnostics, prompts, selective snapshots, skills', flush=True)
             if args.serve:
                 print('PREVIEW_BASE=' + base, flush=True)

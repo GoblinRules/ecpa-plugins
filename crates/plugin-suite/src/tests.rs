@@ -2,6 +2,27 @@ use super::*;
 use std::fs;
 
 #[test]
+fn lifecycle_discards_pending_writes_and_allows_registration_after_shutdown() {
+    let (_dir, mut app, settings) = fixture(Mode::Skills);
+    let body = json!({"id":"codex/sample","version":null,
+        "content":"---\nname: sample\ndescription: Example\n---\nWork"});
+    let preview = app.prepare(&settings, &body).unwrap();
+    assert_eq!(app.dispatch("plugin.quiesce", b"{}")["ok"], true);
+    assert!(app.apply(&settings, &preview).is_err());
+    assert!(!settings.skills["codex"].exists());
+    let preview = app.prepare(&settings, &body).unwrap();
+    assert_eq!(app.dispatch("plugin.shutdown", b"{}")["ok"], true);
+    assert!(app.settings.is_none());
+    assert!(app.apply(&settings, &preview).is_err());
+    assert!(!settings.skills["codex"].exists());
+    assert_eq!(app.dispatch("plugin.shutdown", b"{}")["ok"], true);
+    let registered = app.dispatch("plugin.register", b"{}");
+    assert_eq!(registered["ok"], true);
+    assert_eq!(registered["result"]["schema_version"], 6);
+    assert!(app.settings.is_some());
+}
+
+#[test]
 fn mcp_server_assignment_translation_rename_delete_and_conflicts() {
     let (_dir, mut app, settings) = fixture(Mode::Mcp);
     fs::write(&settings.configs["claude-config"], r#"{"keep":42,"mcpServers":{"old":{"command":"node","args":["old.js"]},"unrelated":{"command":"other"}}}"#).unwrap();
