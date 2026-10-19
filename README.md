@@ -14,6 +14,8 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Available plugins
 
+- **[Connections Manager](plugins/connections-manager/README.md)** — Named Cloudflare/GitHub accounts in Windows Credential Manager, project assignments and a CLI/MCP launcher shared across agents.
+
 - **[Agent Instructions](plugins/agent-instructions/README.md)** — edit global instructions for Claude Code, Codex, Kimi Code, Grok Build, ZCode, and Antigravity. Includes backups, restore, conflict detection, and optional remembered login. Windows x64; tested with CLIProxyAPI v8.0.29.
 
 - **[Agent Profiles](plugins/agent-profiles/README.md)** — Named instruction sets with previewed application and backups.
@@ -25,7 +27,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Interface and artwork
 
-All seven plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors follow ECPA’s Local Clients layout: charcoal panels, blue accents, persistent left navigation and a spacious editor. Embedded pages retain the sidebar above 650px; phone-sized Instructions views use an agent selector.
+All plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors follow ECPA’s Local Clients layout: charcoal panels, blue accents, persistent left navigation and a spacious editor. Embedded pages retain the sidebar above 650px; phone-sized Instructions views use an agent selector.
 
 Plugin/store metadata publishes HTTPS logo URLs. Current ECPA versions that hardcode puzzle icons need the upstream card-logo UI change to display them; plugin updates cannot change host app buttons or cards. Find in store / Check for updates is also an ECPA app change (PR #458).
 

@@ -1,0 +1,114 @@
+use connections_manager::{
+    store::{self, environment, Store},
+    vault::SystemVault,
+};
+use std::{path::PathBuf, process::Command};
+const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
+fn run() -> Result<i32, String> {
+    let mut args = std::env::args().skip(1).peekable();
+    let mut dir = None;
+    if args.peek().map(String::as_str) == Some("--data-dir") {
+        args.next();
+        dir = Some(PathBuf::from(args.next().ok_or("Missing data directory")?));
+    }
+    let action = args.next().unwrap_or_else(|| "help".into());
+    if ["help", "--help", "-h"].contains(&action.as_str()) {
+        print!("{HELP}");
+        return Ok(0);
+    }
+    let store = Store::new(match dir {
+        Some(d) => d,
+        None => store::default_dir()?,
+    })?;
+    match action.as_str() {
+        "list" => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&store.state(&SystemVault)?)
+                    .map_err(|_| "Cannot encode list")?
+            );
+            Ok(0)
+        }
+        "check" => {
+            let id = args.next().ok_or("Missing connection ID")?;
+            println!(
+                "{}",
+                connections_manager::verify(&store, &id, &SystemVault)?
+            );
+            Ok(0)
+        }
+        "run" => {
+            let selector = args.next().ok_or("Choose --connection or --project")?;
+            let value = args.next().ok_or("Missing selection")?;
+            let lock = store.lock(false)?;
+            let selected = match selector.as_str() {
+                "--connection" => store.selected(Some(&value), None)?,
+                "--project" => store.selected(None, Some(&value))?,
+                _ => return Err("Choose --connection or --project".into()),
+            };
+            if args.next().as_deref() != Some("--") {
+                return Err("Use -- before the executable".into());
+            }
+            let exe = args.next().ok_or("Missing executable")?;
+            let extension = PathBuf::from(&exe)
+                .extension()
+                .map(|s| s.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            if ["cmd", "bat", "ps1"].contains(&extension.as_str()) {
+                return Err("Use a native executable (for Wrangler: node.exe plus wrangler/bin/wrangler.js), not a shell script".into());
+            }
+            let env = environment(&selected, &store, &SystemVault)?;
+            drop(lock);
+            let mut child = Command::new(&exe);
+            child.args(args);
+            if selector == "--project" {
+                child.current_dir(&value);
+            }
+            // Remove competing inherited credentials before adding this selection.
+            for name in [
+                "CLOUDFLARE_API_TOKEN",
+                "CLOUDFLARE_ACCOUNT_ID",
+                "CLOUDFLARE_API_KEY",
+                "CLOUDFLARE_EMAIL",
+                "CF_API_TOKEN",
+                "CF_ACCOUNT_ID",
+                "CF_API_KEY",
+                "CF_EMAIL",
+                "CLOUDFLARE_API_BASE_URL",
+                "GH_TOKEN",
+                "GITHUB_TOKEN",
+                "GITHUB_PERSONAL_ACCESS_TOKEN",
+                "GH_ENTERPRISE_TOKEN",
+                "GITHUB_ENTERPRISE_TOKEN",
+                "GH_HOST",
+            ] {
+                child.env_remove(name);
+            }
+            for (name, value) in &env {
+                child.env(name, value.as_str());
+            }
+            eprintln!(
+                "ECPA connections: {}",
+                selected
+                    .iter()
+                    .map(|c| format!("{} ({})", c.name, c.id))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            let status = child
+                .status()
+                .map_err(|_| "Cannot start executable; check its path and installation")?;
+            Ok(status.code().unwrap_or(1))
+        }
+        _ => Err("Unknown command. Use ecpa-connect --help".into()),
+    }
+}
+fn main() {
+    match run() {
+        Ok(code) => std::process::exit(code),
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1)
+        }
+    }
+}

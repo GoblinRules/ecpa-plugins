@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import platform
+import shutil
 import subprocess
 import zipfile
 from validate import ROOT, select_plugins
@@ -28,12 +29,20 @@ def package(plugin=None):
             out.write(binary, f'{plugin_id}.{extension}')
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         checksums = dist / 'checksums.txt'
-        checksums.write_text(f'{digest}  {archive.name}\n', encoding='utf-8')
+        checksum_lines = [f'{digest}  {archive.name}\n']
+        extra_assets = []
+        if plugin_id == 'connections-manager':
+            assert os_name == 'windows', 'Connections Manager requires Windows Credential Manager'
+            helper = dist / f'ecpa-connect_{os_name}_{arch}.exe'
+            shutil.copy2(ROOT / 'target/release/ecpa-connect.exe', helper)
+            checksum_lines.append(f'{hashlib.sha256(helper.read_bytes()).hexdigest()}  {helper.name}\n')
+            extra_assets.append(helper)
+        checksums.write_text(''.join(checksum_lines), encoding='utf-8')
         manifest = dist / 'release.json'
         manifest.write_text(json.dumps({'plugin': plugin_id, 'version': version,
             'repository': entry['repository'], 'sourceRepository': 'https://github.com/GoblinRules/ecpa-plugins',
             'sourceCommit': commit, 'asset': archive.name, 'sha256': digest}, indent=2)+'\n', encoding='utf-8')
-        outputs.append((entry, [archive, checksums, manifest]))
+        outputs.append((entry, [archive, checksums, manifest, *extra_assets]))
         print(archive)
     return outputs
 

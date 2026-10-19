@@ -1,0 +1,28 @@
+[package]
+name = "connections-manager"
+version = "0.1.0"
+repository = "https://github.com/GoblinRules/ecpa-connections-manager"
+edition = "2021"
+license = "MIT"
+description = "Named Cloudflare and GitHub connections with secure local credentials and project assignments."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "ecpa-connect"
+path = "src/bin/ecpa-connect.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+base64 = "0.22"
+sha2 = "0.10"
+tempfile = "3"
+fs2 = "0.4"
+ureq = { version = "2", features = ["json"] }
+zeroize = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Credentials"] }

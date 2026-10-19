@@ -1,0 +1,71 @@
+# Connections Manager
+
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.1.0.
+
+## Install
+
+Add the [ECPA Plugins registry](https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/registry.json), install **Connections Manager**, and open its page. Unlock with the proxy management key. The key is session-only; account tokens are stored in **Windows Credential Manager**, never in the catalogue or agent instructions.
+
+Download `ecpa-connect_windows_amd64.exe` and `checksums.txt` from the [release repository](https://github.com/GoblinRules/ecpa-connections-manager/releases/latest). Verify the helper's SHA-256 with `Get-FileHash`, save it in a stable location such as `C:\Tools`, and optionally rename it `ecpa-connect.exe`. The plugin installer installs the DLL; the helper is a separate executable and is not automatically installed or added to PATH.
+
+The core, helper and agents must run as the **same Windows user**. A core running as a Windows service account has a different credential vault. This release manages local connections; it does not synchronize credentials to other computers.
+
+## Add accounts
+
+Create one connection per account: e.g. `cf-personal`, `cf-work`, `cf-client-a`, `gh-personal`, `gh-work`. IDs are stable lowercase letters, digits and hyphens. Display names can be edited freely. A connection's service cannot be changed. A blank token when editing keeps the saved token; entering a token replaces it.
+
+- **Cloudflare:** supply the 32-character account ID and a scoped API token. Choose permissions needed by your work. **Verify account** calls the account-details endpoint and requires Account Settings: Read. A token can work for deployment but fail this identity check if it lacks that read permission. Account-scoped tokens and user API tokens are supported when they can access that account endpoint.
+- **GitHub:** supply a GitHub.com personal access token with access to the repositories you need. Verification identifies the authenticated user; it does not prove access to every repository.
+
+Verification connects only to `api.cloudflare.com` or `api.github.com`, with TLS and redirects disabled. It returns account identity, not the token. Corporate proxy support is limited to the HTTP client's supported environment configuration; it does not inherit the core's custom transport settings.
+
+## Project assignments
+
+Assign a Cloudflare and/or GitHub connection to an existing absolute project directory. The helper resolves the nearest assigned ancestor, so a nested project can override its parent. Running with `--project` also sets the child process's working directory to that directory. Choose None for both services to remove an assignment. Assigned connections cannot be deleted until those references are removed.
+
+Assignments are local metadata, not automatic modifications to agent configs. A normal `wrangler` or `gh` invocation still uses that tool's normal credentials. Use the helper to select managed connections.
+
+## CLI usage
+
+```powershell
+& 'C:\Tools\ecpa-connect.exe' list
+& 'C:\Tools\ecpa-connect.exe' check cf-work
+& 'C:\Tools\ecpa-connect.exe' run --connection gh-work -- gh.exe repo list
+& 'C:\Tools\ecpa-connect.exe' run --project 'C:\Projects\client-site' -- gh.exe auth status
+& 'C:\Tools\ecpa-connect.exe' run --connection cf-work -- node.exe 'C:\Projects\client-site\node_modules\wrangler\bin\wrangler.js' whoami
+```
+
+On Windows, use `node.exe` plus Wrangler's JavaScript entry point instead of the `wrangler.cmd` shim. The helper rejects `.cmd`, `.bat` and `.ps1` entry points. It passes arguments directly to the selected executable, with no constructed shell command. For agents distributed as npm shims, use the corresponding Node entry point too.
+
+Cloudflare supplies `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. GitHub supplies `GH_TOKEN`, `GITHUB_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN` and `GH_HOST=github.com`. Competing inherited variables for these services are removed from the child environment. The parent shell and global login files are unchanged. Multiple processes can therefore use different accounts concurrently. Other tool config files and command flags still apply: check Wrangler's account configuration for conflicts with the selected account.
+
+The launched process and its children can read the selected tokens. Use trusted executables and MCP servers. Tokens never appear in helper arguments or helper logs, but a child process could print its own environment. This is account selection, not an OS sandbox.
+
+GitHub CLI authentication is not a Git SSH identity manager. Git's SSH keys/HTTPS credential helpers and browser logins are separate. GitHub Enterprise and remote OAuth MCP session brokering are not implemented.
+
+## Claude / Codex / MCP Manager
+
+The **Use with agents & tools** page generates PowerShell commands and Claude JSON or Codex TOML snippets. Select the MCP server executable and its arguments, then merge the generated server entry into the agent config. You can also paste the individual Claude server definition into MCP Manager's advanced editor and use its preview/apply flow. Tokens stay out of those files.
+
+The helper passes through stdin/stdout and the child exit code; its account selection message goes to stderr, preserving stdio MCP framing. Only token-based servers accepting the listed environment variables are supported. Remote OAuth-only servers need their own login flow.
+
+To use a whole agent session with a project's connections, launch the agent executable through `run --project ...`; its child CLI processes inherit the environment. This does not install a Codex plugin, Claude extension or change instructions automatically.
+
+## Storage and recovery
+
+Default catalogue: `%LOCALAPPDATA%\ECPA\connections-manager\connections.json`. Only connection names, IDs, account IDs and project assignments are stored there. `data_dir` in the plugin's settings accepts an absolute directory; pass the same directory to the helper with `--data-dir PATH` **before** its command. The UI includes it in generated commands.
+
+Credential targets are namespaced by the catalogue directory. Moving the catalogue or changing `data_dir` requires re-entering tokens; copying the JSON alone does not transfer credentials. Catalogue writes are locked and atomic, and stale browser saves are rejected. Do not manually edit the catalogue while tools are using it. Deleting a connection removes its vault token; uninstalling the DLL intentionally preserves both metadata and credentials. Delete connections first if you want them removed.
+
+## Development and verification
+
+```powershell
+cargo test -p connections-manager --locked
+cargo clippy -p connections-manager --all-targets --locked -- -D warnings
+python scripts/package.py --plugin connections-manager
+python plugins/connections-manager/tests/integration.py --core C:/path/to/cli-proxy-api.exe
+```
+
+The real-core test creates uniquely scoped synthetic credentials, verifies process isolation and removes those credentials in cleanup. `--serve` leaves the synthetic fixture available for the documented browser test until stopped. No personal credentials are used.
+
+References: [Wrangler environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [GitHub CLI environment](https://cli.github.com/manual/gh_help_environment).

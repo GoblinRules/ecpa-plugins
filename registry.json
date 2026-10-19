@@ -104,6 +104,23 @@
         "Agents"
       ],
       "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/agent-skills.svg"
+    },
+    {
+      "id": "connections-manager",
+      "name": "Connections Manager",
+      "description": "Named Cloudflare and GitHub accounts, secure Windows credentials, project assignments and a process-scoped CLI/MCP helper.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-connections-manager",
+      "homepage": "https://github.com/GoblinRules/ecpa-connections-manager",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "Cloudflare",
+        "GitHub",
+        "MCP",
+        "Credentials"
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/connections-manager.svg"
     }
   ]
 }
