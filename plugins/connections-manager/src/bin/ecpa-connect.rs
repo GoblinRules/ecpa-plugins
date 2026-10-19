@@ -3,7 +3,7 @@ use connections_manager::{
     vault::SystemVault,
 };
 use std::{path::PathBuf, process::Command};
-const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
+const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] login-github ID NAME\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
 fn run() -> Result<i32, String> {
     let mut args = std::env::args().skip(1).peekable();
     let mut dir = None;
@@ -21,6 +21,17 @@ fn run() -> Result<i32, String> {
         None => store::default_dir()?,
     })?;
     match action.as_str() {
+        "login-github" => {
+            let id = args.next().ok_or("Supply an account ID and display name")?;
+            let name = args
+                .next()
+                .ok_or("Supply a display name (quote names with spaces)")?;
+            if args.next().is_some() {
+                return Err("Unexpected login arguments".into());
+            }
+            login_github(&store, &id, &name)?;
+            Ok(0)
+        }
         "list" => {
             println!(
                 "{}",
@@ -109,6 +120,126 @@ fn main() {
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(1)
+        }
+    }
+}
+
+// Use an ephemeral gh profile, never the user's global login or keychain entry.
+fn github_command(profile: &std::path::Path) -> Command {
+    let mut cmd = Command::new("gh.exe");
+    cmd.env("GH_CONFIG_DIR", profile)
+        .env("GH_HOST", "github.com");
+    for key in [
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_DEBUG",
+        "DEBUG",
+        "GH_PROMPT_DISABLED",
+    ] {
+        cmd.env_remove(key);
+    }
+    cmd
+}
+fn login_github(store: &Store, id: &str, name: &str) -> Result<(), String> {
+    let connection = store::Connection {
+        id: id.into(),
+        name: name.into(),
+        service: "github".into(),
+        account_id: String::new(),
+    };
+    store::validate(&connection)?;
+    let version = {
+        let _lock = store.lock(false)?;
+        let (data, version) = store.load()?;
+        if data.connections.iter().any(|c| c.id == id) {
+            return Err(
+                "This ID already exists. Use a new ID to avoid replacing an account.".into(),
+            );
+        }
+        version
+    };
+    let profile = tempfile::Builder::new()
+        .prefix("ecpa-github-login-")
+        .tempdir()
+        .map_err(|_| "Cannot create temporary login profile")?;
+    eprintln!("Sign in to the intended GitHub account in your browser. Your normal gh login is unchanged.");
+    // gh's credential-store keys are not namespaced by GH_CONFIG_DIR. A temporary
+    // file avoids overwriting global keychain entries; it is removed after import.
+    let status = github_command(profile.path())
+        .args([
+            "auth",
+            "login",
+            "--hostname",
+            "github.com",
+            "--web",
+            "--git-protocol",
+            "https",
+            "--insecure-storage",
+        ])
+        .status()
+        .map_err(|_| "Install GitHub CLI (gh.exe) before signing in")?;
+    if !status.success() {
+        return Err("GitHub sign-in was cancelled or failed; no connection saved".into());
+    }
+    let output = github_command(profile.path())
+        .args(["auth", "token", "--hostname", "github.com"])
+        .output()
+        .map_err(|_| "Cannot retrieve GitHub login")?;
+    let bytes = zeroize::Zeroizing::new(output.stdout);
+    if !output.status.success() {
+        return Err("GitHub login did not provide a credential".into());
+    }
+    let token = std::str::from_utf8(&bytes)
+        .map_err(|_| "Invalid GitHub credential")?
+        .trim();
+    let identity = github_command(profile.path())
+        .env("GH_TOKEN", token)
+        .args(["api", "user", "--jq", ".login"])
+        .output()
+        .map_err(|_| "Cannot verify GitHub identity")?;
+    if !identity.status.success() {
+        return Err("GitHub identity verification failed; no connection saved".into());
+    }
+    let login = String::from_utf8_lossy(&identity.stdout).trim().to_string();
+    if login.is_empty() {
+        return Err("GitHub returned no identity".into());
+    }
+    eprintln!("Verified GitHub account: {login}. Type this username to save it as {name}:");
+    let mut confirmation = String::new();
+    std::io::stdin()
+        .read_line(&mut confirmation)
+        .map_err(|_| "Cannot read confirmation")?;
+    if confirmation.trim() != login {
+        return Err("Account was not confirmed; nothing saved".into());
+    }
+    let mut body = serde_json::json!({"version":version,"connection":connection,"token":token});
+    let result = store.mutate("save", &body, &SystemVault);
+    if let Some(serde_json::Value::String(secret)) = body.get_mut("token") {
+        zeroize::Zeroize::zeroize(secret);
+    }
+    result?;
+    profile
+        .close()
+        .map_err(|_| "Account saved, but temporary login cleanup failed")?;
+    eprintln!("Saved {name} ({login}) in Windows Credential Manager. Refresh Connections Manager to use it.");
+    Ok(())
+}
+
+#[cfg(test)]
+mod login_tests {
+    use super::*;
+    #[test]
+    fn login_isolates_config_and_removes_inherited_credentials_and_debug() {
+        let cmd = github_command(std::path::Path::new("isolated-profile"));
+        let env: std::collections::BTreeMap<_, _> = cmd.get_envs().collect();
+        assert_eq!(
+            env[std::ffi::OsStr::new("GH_CONFIG_DIR")],
+            Some(std::ffi::OsStr::new("isolated-profile"))
+        );
+        for key in ["GH_TOKEN", "GITHUB_TOKEN", "GH_DEBUG", "DEBUG"] {
+            assert_eq!(env[std::ffi::OsStr::new(key)], None);
         }
     }
 }

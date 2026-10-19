@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Guided account onboarding, helpful empty project state and explicit tool/MCP choices.
+- Isolated GitHub CLI browser login, verified username confirmation and Windows vault import.
+- Prevent generating MCP configuration for ordinary GitHub CLI or Wrangler commands.
+- Explain agent inheritance and the current Wrangler/remote MCP OAuth limitations.
+- Update both the plugin and the separately downloaded helper for GitHub sign-in.
+
 ## 0.1.0
 
 - Named Cloudflare and GitHub connections with Windows Credential Manager storage.

@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.1.0.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.2.0.
 
 ## Install
 
@@ -69,3 +69,21 @@ python plugins/connections-manager/tests/integration.py --core C:/path/to/cli-pr
 The real-core test creates uniquely scoped synthetic credentials, verifies process isolation and removes those credentials in cleanup. `--serve` leaves the synthetic fixture available for the documented browser test until stopped. No personal credentials are used.
 
 References: [Wrangler environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [GitHub CLI environment](https://cli.github.com/manual/gh_help_environment).
+
+## GitHub browser sign-in (0.2.0)
+
+Use **Add an account → Sign in with GitHub CLI** to generate a PowerShell command, or run:
+
+```powershell
+& 'C:\Tools\ecpa-connect.exe' login-github gh-work 'GitHub Work'
+```
+
+Install GitHub CLI first and update the helper as well as the plugin. Finish the browser/device-code flow, then type the verified username in the terminal. Click Refresh in the plugin. Each new ID is independent; existing IDs cannot be overwritten by this command. The resulting OAuth token uses the same Windows vault and per-process selection as API tokens. Reauthenticate with a new connection if GitHub revokes the token; this is not a generic OAuth refresh broker.
+
+The helper uses an ephemeral `GH_CONFIG_DIR` and `--insecure-storage` because gh's system credential entries are not isolated by its config directory. It imports the token into Windows Credential Manager and deletes the temporary profile on normal success, error or cancellation. Forced process termination or machine failure can leave an `ecpa-github-login-*` folder in the current user's temporary directory containing the token; remove that leftover folder. No global gh login is changed. No sign-in is performed from the web server process.
+
+**Agent setup:** choose a saved account and a local stdio MCP server under **Connect a tool or agent**, generate Claude or Codex configuration, merge it into that agent's MCP configuration, then restart the server. GitHub CLI and Wrangler themselves are not MCP servers. Alternatively launch a new agent executable through the helper so its child tools inherit the account. Existing agent sessions are unaffected.
+
+Wrangler OAuth profiles and remote MCP OAuth remain unsupported by this helper. Use a Cloudflare API token for Wrangler, and the agent's own OAuth flow for a remote MCP server. A Wrangler OAuth session is not interchangeable with an MCP OAuth session.
+
+Validation: Rust tests, native-core integration and responsive Edge tests pass. `tests/login.py` tests the browser-login orchestration with a native fake gh, synthetic credentials and the real Windows vault, including cancellation and cleanup. Real GitHub authorization requires the user's interactive browser consent and was not performed by automated tests.
