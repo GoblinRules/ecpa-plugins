@@ -1,6 +1,6 @@
 [package]
 name = "connections-manager"
-version = "0.2.0"
+version = "0.3.0"
 repository = "https://github.com/GoblinRules/ecpa-connections-manager"
 edition = "2021"
 license = "MIT"

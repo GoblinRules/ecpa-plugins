@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Reuse existing GitHub CLI logins through an interactive account picker, without browser sign-in.
+- Verify the selected identity before securely importing a credential copy.
+- Preserve the source CLI profile and active account; ignore competing inherited tokens.
+- Add tests for account selection, missing logins, identity mismatch, cancellation and generated commands.
+- Update both the plugin and helper to use this feature.
+
 ## 0.2.0
 
 - Guided account onboarding, helpful empty project state and explicit tool/MCP choices.

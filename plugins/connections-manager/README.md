@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.2.0.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.3.0.
 
 ## Install
 
@@ -87,3 +87,17 @@ The helper uses an ephemeral `GH_CONFIG_DIR` and `--insecure-storage` because gh
 Wrangler OAuth profiles and remote MCP OAuth remain unsupported by this helper. Use a Cloudflare API token for Wrangler, and the agent's own OAuth flow for a remote MCP server. A Wrangler OAuth session is not interchangeable with an MCP OAuth session.
 
 Validation: Rust tests, native-core integration and responsive Edge tests pass. `tests/login.py` tests the browser-login orchestration with a native fake gh, synthetic credentials and the real Windows vault, including cancellation and cleanup. Real GitHub authorization requires the user's interactive browser consent and was not performed by automated tests.
+
+## Use an existing local GitHub login (0.3.0)
+
+In **Add an account → Use an existing GitHub login or sign in**, keep **Use an existing local GitHub login** selected. Set the helper path, a new connection ID and a display name, then generate and run the command in PowerShell:
+
+```powershell
+& 'C:\Tools\ecpa-connect.exe' import-github gh-work 'GitHub Work'
+```
+
+The terminal lists saved github.com accounts from GitHub CLI. Choose a number, then confirm the verified username. Refresh the plugin afterwards. No browser sign-in is needed. Requires a recent GitHub CLI with `auth status --json` and `auth token --user` support. Discovery respects your shell's `GH_CONFIG_DIR` and Windows user; inherited token environment variables are ignored so they cannot override the chosen saved account. The import never runs `gh auth switch` or modifies the source profile.
+
+The saved credential is a **copy**, not a live link: revoking the original invalidates it, and later replacing a gh login does not automatically update this connection. Existing connection IDs are protected against overwrite. Identity verification requires network access and rejects an account mismatch. Tokens are never included in generated commands or printed by the helper.
+
+This feature imports GitHub service credentials only. Codex/Claude agent authentication remains managed by those applications. Wrangler OAuth and remote MCP OAuth remain separate, unsupported import types.

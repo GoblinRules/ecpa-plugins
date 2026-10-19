@@ -3,7 +3,7 @@ use connections_manager::{
     vault::SystemVault,
 };
 use std::{path::PathBuf, process::Command};
-const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] login-github ID NAME\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
+const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] login-github ID NAME\necpa-connect [--data-dir PATH] import-github ID NAME\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
 fn run() -> Result<i32, String> {
     let mut args = std::env::args().skip(1).peekable();
     let mut dir = None;
@@ -21,7 +21,7 @@ fn run() -> Result<i32, String> {
         None => store::default_dir()?,
     })?;
     match action.as_str() {
-        "login-github" => {
+        "login-github" | "import-github" => {
             let id = args.next().ok_or("Supply an account ID and display name")?;
             let name = args
                 .next()
@@ -29,7 +29,11 @@ fn run() -> Result<i32, String> {
             if args.next().is_some() {
                 return Err("Unexpected login arguments".into());
             }
-            login_github(&store, &id, &name)?;
+            if action == "import-github" {
+                import_github(&store, &id, &name)?;
+            } else {
+                login_github(&store, &id, &name)?;
+            }
             Ok(0)
         }
         "list" => {
@@ -126,9 +130,13 @@ fn main() {
 
 // Use an ephemeral gh profile, never the user's global login or keychain entry.
 fn github_command(profile: &std::path::Path) -> Command {
+    let mut cmd = local_github_command();
+    cmd.env("GH_CONFIG_DIR", profile);
+    cmd
+}
+fn local_github_command() -> Command {
     let mut cmd = Command::new("gh.exe");
-    cmd.env("GH_CONFIG_DIR", profile)
-        .env("GH_HOST", "github.com");
+    cmd.env("GH_HOST", "github.com");
     for key in [
         "GH_TOKEN",
         "GITHUB_TOKEN",
@@ -224,6 +232,125 @@ fn login_github(store: &Store, id: &str, name: &str) -> Result<(), String> {
         .close()
         .map_err(|_| "Account saved, but temporary login cleanup failed")?;
     eprintln!("Saved {name} ({login}) in Windows Credential Manager. Refresh Connections Manager to use it.");
+    Ok(())
+}
+
+/// Read saved accounts through gh's supported API, preserving its configured profile.
+/// Never switch the active account or print the credential.
+fn import_github(store: &Store, id: &str, name: &str) -> Result<(), String> {
+    let connection = store::Connection {
+        id: id.into(),
+        name: name.into(),
+        service: "github".into(),
+        account_id: String::new(),
+    };
+    store::validate(&connection)?;
+    let version = {
+        let _lock = store.lock(false)?;
+        let (data, version) = store.load()?;
+        if data.connections.iter().any(|c| c.id == id) {
+            return Err("This ID already exists. Choose a new ID.".into());
+        }
+        version
+    };
+    let output = local_github_command()
+        .args([
+            "auth",
+            "status",
+            "--hostname",
+            "github.com",
+            "--json",
+            "hosts",
+            "--jq",
+            "[.hosts[\"github.com\"][] | .login]",
+        ])
+        .output()
+        .map_err(|_| "Install GitHub CLI (gh.exe) to discover saved logins")?;
+    if !output.status.success() {
+        return Err(
+            "Cannot discover saved GitHub logins. Update GitHub CLI or use browser sign-in.".into(),
+        );
+    }
+    let mut accounts: Vec<String> = serde_json::from_slice(&output.stdout)
+        .map_err(|_| "GitHub CLI returned an unexpected account list")?;
+    accounts.retain(|a| {
+        !a.is_empty() && a.len() <= 100 && a.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
+    });
+    accounts.sort();
+    accounts.dedup();
+    if accounts.is_empty() {
+        return Err("No saved github.com accounts found for this Windows user and GH_CONFIG_DIR. Use browser sign-in first.".into());
+    }
+    eprintln!("Saved GitHub accounts (your active account will not change):");
+    for (index, account) in accounts.iter().enumerate() {
+        eprintln!("  {}. {}", index + 1, account);
+    }
+    eprintln!("Enter the account number to import, or press Enter to cancel:");
+    let mut selection = String::new();
+    std::io::stdin()
+        .read_line(&mut selection)
+        .map_err(|_| "Cannot read account selection")?;
+    let index = selection
+        .trim()
+        .parse::<usize>()
+        .ok()
+        .and_then(|n| n.checked_sub(1))
+        .ok_or("Import cancelled or invalid selection; nothing saved")?;
+    let username = accounts
+        .get(index)
+        .ok_or("Invalid selection; nothing saved")?;
+    let output = local_github_command()
+        .args([
+            "auth",
+            "token",
+            "--hostname",
+            "github.com",
+            "--user",
+            username,
+        ])
+        .output()
+        .map_err(|_| "Cannot read the selected GitHub login")?;
+    let bytes = zeroize::Zeroizing::new(output.stdout);
+    if !output.status.success() {
+        return Err("Saved GitHub credential is unavailable; sign in again".into());
+    }
+    let token = std::str::from_utf8(&bytes)
+        .map_err(|_| "Invalid credential")?
+        .trim();
+    if token.is_empty() {
+        return Err("Saved GitHub credential is empty".into());
+    }
+    let identity = local_github_command()
+        .env("GH_TOKEN", token)
+        .args(["api", "user", "--jq", ".login"])
+        .output()
+        .map_err(|_| "Cannot verify selected account")?;
+    if !identity.status.success() {
+        return Err(
+            "Saved login could not be verified. Check connectivity or sign in again.".into(),
+        );
+    }
+    let login = String::from_utf8_lossy(&identity.stdout).trim().to_string();
+    if !login.eq_ignore_ascii_case(username) {
+        return Err(
+            "Credential identity does not match the selected account; nothing saved".into(),
+        );
+    }
+    eprintln!("Verified {login}. Type this username to save a credential copy as {name}:");
+    let mut confirmation = String::new();
+    std::io::stdin()
+        .read_line(&mut confirmation)
+        .map_err(|_| "Cannot read confirmation")?;
+    if confirmation.trim() != login {
+        return Err("Import cancelled; nothing saved".into());
+    }
+    let mut body = serde_json::json!({"version":version,"connection":connection,"token":token});
+    let result = store.mutate("save", &body, &SystemVault);
+    if let Some(serde_json::Value::String(secret)) = body.get_mut("token") {
+        zeroize::Zeroize::zeroize(secret);
+    }
+    result?;
+    eprintln!("Imported {login} into Windows Credential Manager. Refresh Connections Manager. This is a copy, not a live link to gh; revocation still applies.");
     Ok(())
 }
 

@@ -10,12 +10,15 @@ with tempfile.TemporaryDirectory(prefix="ecpa-login-test-") as temp:
         let args: Vec<String> = std::env::args().skip(1).collect();
         let profile = std::env::var("GH_CONFIG_DIR").unwrap();
         std::fs::write(std::env::var("PROFILE_RECORD").unwrap(), &profile).unwrap();
-        if args[0] == "auth" && args[1] == "login" {
+        if args[0] == "auth" && args[1] == "status" {
+            assert!(std::env::var_os("GH_TOKEN").is_none());
+            println!("{}", if std::env::var_os("EMPTY_ACCOUNTS").is_some() { "[]" } else { r#"["other-user","fixture-user"]"# });
+        } else if args[0] == "auth" && args[1] == "login" {
             assert!(std::env::var_os("GH_TOKEN").is_none());
             assert!(args.contains(&"--insecure-storage".to_string()));
             std::fs::write(std::path::Path::new(&profile).join("hosts.yml"), "synthetic-oauth-secret").unwrap();
-        } else if args[0] == "auth" && args[1] == "token" { println!("synthetic-oauth-secret"); }
-        else if args[0] == "api" { assert_eq!(std::env::var("GH_TOKEN").unwrap(), "synthetic-oauth-secret"); println!("fixture-user"); }
+        } else if args[0] == "auth" && args[1] == "token" { if args.contains(&"--user".to_string()) { assert_eq!(args.last().unwrap(), "fixture-user"); } println!("synthetic-oauth-secret"); }
+        else if args[0] == "api" { assert_eq!(std::env::var("GH_TOKEN").unwrap(), "synthetic-oauth-secret"); println!("{}", if std::env::var_os("WRONG_IDENTITY").is_some() { "wrong-user" } else { "fixture-user" }); }
         else { panic!("unexpected command"); }
     }''')
     subprocess.run(["rustc", str(source), "-o", str(root / "gh.exe")], check=True)
@@ -36,8 +39,28 @@ with tempfile.TemporaryDirectory(prefix="ecpa-login-test-") as temp:
         assert "synthetic-oauth-secret" not in catalogue
         assert json.loads(catalogue)["connections"][0]["id"] == "oauth-test"
         assert login("oauth-test", "fixture-user\n").returncode != 0
+        profile = root / "existing-profile"
+        profile.mkdir()
+        original = profile / "hosts.yml"
+        original.write_text("existing configuration must not change")
+        env["GH_CONFIG_DIR"] = str(profile)
+        def imported(id, answers, **extra):
+            result = subprocess.run([str(helper), "--data-dir", str(data), "import-github", id, "Existing login"], env=dict(env, **extra), input=answers, text=True, capture_output=True)
+            assert "synthetic-oauth-secret" not in result.stdout + result.stderr
+            assert original.read_text() == "existing configuration must not change"
+            assert (root / "profile.txt").read_text() == str(profile)
+            return result
+        for answers, extra in [("\n", {}), ("9\n", {}), ("1\nwrong\n", {}), ("1\nfixture-user\n", {"WRONG_IDENTITY":"1"}), ("", {"EMPTY_ACCOUNTS":"1"})]:
+            assert imported("cancel-import", answers, **extra).returncode != 0
+            assert len(json.loads((data / "connections.json").read_text())["connections"]) == 1
+        result = imported("import-test", "1\nfixture-user\n")
+        assert result.returncode == 0, result.stderr
+        assert "synthetic-oauth-secret" not in (data / "connections.json").read_text()
+        assert imported("import-test", "1\nfixture-user\n").returncode != 0
+        print("PASS: existing login picker, preserved profile, selected identity check, cancellation, empty accounts and secret-free import")
         print("PASS: isolated OAuth CLI flow, username confirmation, vault import, duplicate protection, secret-free output and temporary profile cleanup")
     finally:
         vault = ctypes.WinDLL("Advapi32.dll", use_last_error=True)
         vault.CredDeleteW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32]
         vault.CredDeleteW(target, 1, 0)
+        vault.CredDeleteW(target.removesuffix("oauth-test")+"import-test", 1, 0)
