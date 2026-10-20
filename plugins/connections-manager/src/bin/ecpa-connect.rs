@@ -16,6 +16,13 @@ fn run() -> Result<i32, String> {
         print!("{HELP}");
         return Ok(0);
     }
+    if action == "diagnostics" {
+        println!(
+            "{}",
+            serde_json::json!({"name":"ecpa-connect","version":env!("CARGO_PKG_VERSION")})
+        );
+        return Ok(0);
+    }
     let store = Store::new(match dir {
         Some(d) => d,
         None => store::default_dir()?,

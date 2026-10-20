@@ -33,6 +33,9 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
     time.sleep(.1)
    else:raise RuntimeError('Core failed to become ready')
    state=api('state');assert not state['connections']
+   diagnostics=api('helper-check',{'path':helper});assert diagnostics['name']=='ecpa-connect' and diagnostics['version']==diagnostics['pluginVersion']
+   assert request('/v0/management/connections-manager/helper-check',{'path':helper},auth=False)[0]==401
+   assert request('/v0/management/connections-manager/helper-check',{'path':'relative.exe'})[0]==400
    assert request('/v0/management/connections-manager/state',auth=False)[0]==401
    code,page=request('/v0/resource/plugins/connections-manager/editor?token=unused',auth=False);assert code==200 and b'Connections Manager' in page
    assert request('/v0/resource/plugins/connections-manager/save',{'token':'synthetic-secret'},auth=False)[0]==404

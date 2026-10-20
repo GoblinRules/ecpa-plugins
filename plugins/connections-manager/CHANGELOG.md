@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Four-step connection wizard with service-specific authentication and fields.
+- Tool and output choices filtered by selected account/project; stale output cleared when switching.
+- Shared helper Settings: one executable for all connections, browser-local path persistence and a Verify helper button.
+- Helper diagnostics checks executable identity and version without opening a terminal window.
+- Updated helper required for verification; existing credentials and accounts remain compatible.
+
 ## 0.4.0
 
 - Portainer connections with server URL validation and Windows vault access-token storage.

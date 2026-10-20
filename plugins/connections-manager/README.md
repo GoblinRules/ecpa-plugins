@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.4.0.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.0.
 
 ## Install
 
@@ -127,3 +127,13 @@ Tools:
 Only these GET routes are implemented. There is no arbitrary HTTP proxy, deployment, restart, exec, deletion or stack-content tool. Response size is bounded at 2 MiB; lists return up to 500 items and mark truncation. Docker log framing is decoded and the connection token is redacted, but application logs can contain other secrets. Returned content is untrusted data.
 
 Validated with synthetic Portainer responses, the actual core, native helper, Windows vault and browser. Reachability of Portainer 2.45.2 was checked separately; real authenticated instance access still requires the user's token. The implementation targets Portainer's `/api/endpoints`, `/api/stacks` and Docker proxy routes. Permission failures and incompatible environment types are returned as tool errors.
+
+## Guided setup and shared helper (0.5.0)
+
+New connections use four steps: **Service → Connection method → Account details → Review and connect**. GitHub offers existing CLI login, browser sign-in and tokens; Cloudflare and Portainer offer their supported token method. Back preserves your draft. Token fields and service-specific fields only appear when relevant. Existing accounts open directly for editing. Save first, then verify access and connect a tool.
+
+Under **Settings**, set the shared `ecpa-connect.exe` (or its downloaded `ecpa-connect_windows_amd64.exe` filename) location once. One executable serves all connections and both agents on the device. **Verify helper** runs its noninteractive diagnostics, checks the identity and reports the helper/plugin versions, with a three-second deadline. It does not test service credentials or establish account connectivity; use **Verify account** for that. Use only a helper executable you trust. Older helpers need updating to support diagnostics.
+
+The helper location is remembered in browser local storage, shared by this editor's workflows. It is not written into the credential catalogue and is not synced across browsers/devices. Secrets remain in the Windows vault. On another browser, set the path again. The path refers to the plugin host's filesystem; run the helper under the same Windows user as the vault.
+
+The tool generator filters choices by selected account or project. Portainer exposes only the built-in MCP and Codex/Claude formats. GitHub and Cloudflare expose matching CLI presets and advanced local MCP/custom executable options. CLI commands offer PowerShell output only. Changing accounts clears stale generated commands.

@@ -112,7 +112,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 json!({})
             }
             "management.register" => {
-                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and project connections"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")}]})
+                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and project connections"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")}]})
             }
             "management.handle" => {
                 let req: Value = serde_json::from_slice(raw).map_err(|_| "Invalid request")?;
@@ -127,7 +127,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 } else if verb == "GET" && path == format!("{API}/state") {
                     response(configured().and_then(|s| s.state(&SystemVault)))
                 } else if verb == "POST"
-                    && ["save", "delete", "assign", "verify"]
+                    && ["save", "delete", "assign", "verify", "helper-check"]
                         .iter()
                         .any(|p| path == format!("{API}/{p}"))
                 {
@@ -144,7 +144,9 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                         let mut body: Value =
                             serde_json::from_slice(&bytes).map_err(|_| "Invalid JSON")?;
                         let action = path.rsplit('/').next().unwrap_or("");
-                        let result = if action == "verify" {
+                        let result = if action == "helper-check" {
+                            helper_check(body["path"].as_str().unwrap_or(""))
+                        } else if action == "verify" {
                             verify(
                                 &s,
                                 body["id"].as_str().ok_or("Missing connection ID")?,
@@ -172,3 +174,71 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
 }
 #[cfg(test)]
 mod tests;
+
+fn helper_check(path: &str) -> Result<Value, String> {
+    use std::{
+        io::Read,
+        process::{Command, Stdio},
+        time::Instant,
+    };
+    let path = std::path::Path::new(path);
+    if !path.is_absolute()
+        || !path.is_file()
+        || !["ecpa-connect.exe", "ecpa-connect_windows_amd64.exe"]
+            .contains(&path.file_name().and_then(|n| n.to_str()).unwrap_or(""))
+    {
+        return Err("Select the full path to ecpa-connect.exe or ecpa-connect_windows_amd64.exe on this device".into());
+    }
+    let mut command = Command::new(path);
+    command
+        .arg("diagnostics")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|_| "Cannot start helper; check the file and Windows permissions")?;
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Err("Helper diagnostics failed. Download the latest helper.".into());
+                }
+                break;
+            }
+            Ok(None) if start.elapsed() < Duration::from_secs(3) => {
+                std::thread::sleep(Duration::from_millis(30))
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Helper did not respond within 3 seconds".into());
+            }
+        }
+    }
+    let mut text = String::new();
+    child
+        .stdout
+        .take()
+        .ok_or("Missing helper output")?
+        .take(8193)
+        .read_to_string(&mut text)
+        .map_err(|_| "Cannot read helper diagnostics")?;
+    if text.len() > 8192 {
+        return Err("Unexpected helper response".into());
+    }
+    let v: Value = serde_json::from_str(&text)
+        .map_err(|_| "This helper does not support diagnostics; download the latest version")?;
+    if v["name"] != "ecpa-connect" || v["version"].as_str().is_none() {
+        return Err("Unexpected helper identity".into());
+    }
+    Ok(
+        json!({"name":"ecpa-connect","version":v["version"],"pluginVersion":env!("CARGO_PKG_VERSION")}),
+    )
+}
