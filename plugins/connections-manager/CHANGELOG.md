@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Portainer connections with server URL validation and Windows vault access-token storage.
+- Authenticated verification against accessible environments.
+- Built-in stdio MCP with read-only environments, stacks, Docker containers and bounded logs.
+- Portainer preset generates Claude/Codex configuration without another server package.
+- Reject redirects, write tools, path injection and unsafe URL changes; filter sensitive metadata.
+- Update both the plugin and helper. Real authenticated Portainer access requires your locally entered token.
+
 ## 0.3.0
 
 - Reuse existing GitHub CLI logins through an interactive account picker, without browser sign-in.

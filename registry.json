@@ -108,7 +108,7 @@
     {
       "id": "connections-manager",
       "name": "Connections Manager",
-      "description": "Named Cloudflare and GitHub accounts, secure Windows credentials, project assignments and a process-scoped CLI/MCP helper.",
+      "description": "Named Cloudflare, GitHub and Portainer connections, secure Windows credentials, project assignments and read-only Portainer MCP tools.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-connections-manager",
       "homepage": "https://github.com/GoblinRules/ecpa-connections-manager",

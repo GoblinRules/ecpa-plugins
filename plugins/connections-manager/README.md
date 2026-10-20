@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.3.0.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.4.0.
 
 ## Install
 
@@ -101,3 +101,29 @@ The terminal lists saved github.com accounts from GitHub CLI. Choose a number, t
 The saved credential is a **copy**, not a live link: revoking the original invalidates it, and later replacing a gh login does not automatically update this connection. Existing connection IDs are protected against overwrite. Identity verification requires network access and rejects an account mismatch. Tokens are never included in generated commands or printed by the helper.
 
 This feature imports GitHub service credentials only. Codex/Claude agent authentication remains managed by those applications. Wrangler OAuth and remote MCP OAuth remain separate, unsupported import types.
+
+## Portainer read-only MCP (0.4.0)
+
+Update both the plugin and the separate `ecpa-connect_windows_amd64.exe` helper. Add an account with service **Portainer**, a name, a connection ID, and its server origin (for example `http://portainer-host.example.ts.net:9000`). Paste an access token from Portainer **My account → Access tokens** into the plugin's local token field and save. Tokens stay in Windows Credential Manager. **Verify account** checks the authenticated environments endpoint and reports the number accessible to the token; it does not claim to identify its owner.
+
+The URL accepts HTTP or HTTPS origins with optional ports. Paths, queries, fragments and embedded credentials are rejected. HTTPS validates certificates. HTTP can be used with a trusted private network such as Tailscale; the machine running the helper must be connected to that network. Changing the destination URL requires entering the token again. Redirects are never followed with the credential.
+
+Choose **Connect a tool or agent → Portainer: built-in read-only MCP**, select the account, enter the full helper path, and generate Claude or Codex configuration. Merge the individual definition into the agent's MCP settings (or use MCP Manager's advanced editor) and restart the agent/server. No additional MCP package or Portainer-side installation is needed. Do not overwrite other MCP entries. Each account should use a distinct server name if you add more than one.
+
+The helper command is:
+
+```powershell
+& 'C:\Tools\ecpa-connect.exe' portainer-mcp portainer-remote
+```
+
+It serves newline-delimited JSON-RPC over stdin/stdout and is meant to be launched by an MCP client. Use `--data-dir PATH` before the command if the plugin uses a custom catalogue location. It reads the selected credential from the vault for each tool call, without passing it through command arguments or config. The same user and catalogue can serve Codex and Claude. Project assignment and generic `run` credential export are not supported for Portainer; use the built-in MCP preset directly.
+
+Tools:
+- `portainer_environments`: accessible environment IDs, names, types and status.
+- `portainer_stacks`: stack metadata, excluding compose files, Git credentials and environment variables.
+- `portainer_containers`: Docker/Swarm container IDs, names, image and status for an explicit environment ID. Kubernetes containers are not supported.
+- `portainer_logs`: up to 200 recent lines for a hexadecimal container ID; no streaming/follow mode.
+
+Only these GET routes are implemented. There is no arbitrary HTTP proxy, deployment, restart, exec, deletion or stack-content tool. Response size is bounded at 2 MiB; lists return up to 500 items and mark truncation. Docker log framing is decoded and the connection token is redacted, but application logs can contain other secrets. Returned content is untrusted data.
+
+Validated with synthetic Portainer responses, the actual core, native helper, Windows vault and browser. Reachability of Portainer 2.45.2 was checked separately; real authenticated instance access still requires the user's token. The implementation targets Portainer's `/api/endpoints`, `/api/stacks` and Docker proxy routes. Permission failures and incompatible environment types are returned as tool errors.

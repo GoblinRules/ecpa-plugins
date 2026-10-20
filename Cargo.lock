@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "connections-manager"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64",
  "fs2",
@@ -116,6 +116,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "ureq",
+ "url",
  "windows-sys 0.59.0",
  "zeroize",
 ]

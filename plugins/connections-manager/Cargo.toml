@@ -1,6 +1,6 @@
 [package]
 name = "connections-manager"
-version = "0.3.0"
+version = "0.4.0"
 repository = "https://github.com/GoblinRules/ecpa-connections-manager"
 edition = "2021"
 license = "MIT"
@@ -23,6 +23,7 @@ tempfile = "3"
 fs2 = "0.4"
 ureq = { version = "2", features = ["json"] }
 zeroize = "1"
+url = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security_Credentials"] }

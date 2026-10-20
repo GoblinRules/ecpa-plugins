@@ -18,6 +18,8 @@ pub struct Connection {
     pub name: String,
     pub service: String,
     pub account_id: String,
+    #[serde(default)]
+    pub base_url: String,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -51,6 +53,9 @@ pub fn validate(c: &Connection) -> Result<(), String> {
     if !valid_id(&c.id) || c.name.trim().is_empty() || c.name.len() > 100 {
         return Err("Use a lowercase connection ID (letters, digits, hyphens) and a name up to 100 characters".into());
     }
+    if c.service != "portainer" && !c.base_url.is_empty() {
+        return Err("URL is only supported for Portainer".into());
+    }
     match c.service.as_str() {
         "cloudflare"
             if c.account_id.len() == 32 && c.account_id.bytes().all(|b| b.is_ascii_hexdigit()) =>
@@ -58,7 +63,8 @@ pub fn validate(c: &Connection) -> Result<(), String> {
             Ok(())
         }
         "github" if c.account_id.is_empty() => Ok(()),
-        _ => Err("Choose GitHub or supply a 32-character Cloudflare account ID".into()),
+        "portainer" if c.account_id.is_empty() => crate::portainer::validate_url(&c.base_url),
+        _ => Err("Choose GitHub, Portainer with a server URL, or Cloudflare with a 32-character account ID".into()),
     }
 }
 pub fn project_path(path: &str) -> Result<String, String> {
@@ -154,6 +160,14 @@ impl Store {
                                 .into(),
                         );
                     }
+                }
+                if data
+                    .connections
+                    .iter()
+                    .any(|old| old.id == c.id && old.base_url != c.base_url)
+                    && body["token"].as_str().unwrap_or("").trim().is_empty()
+                {
+                    return Err("Re-enter the token when changing the Portainer URL".into());
                 }
                 let token = body["token"].as_str().unwrap_or("").trim();
                 let target = self.target(&c.id);

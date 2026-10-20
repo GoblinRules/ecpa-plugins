@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
   env={**os.environ,'GH_TOKEN':'parent-gh','CLOUDFLARE_API_TOKEN':'parent-cf','CLOUDFLARE_API_KEY':'parent-key','GITHUB_PERSONAL_ACCESS_TOKEN':'parent-mcp'}
   r=subprocess.run([helper,'--data-dir',str(data),'run',*selection,'--',sys.executable,'-c',check],capture_output=True,text=True,env=env,timeout=20)
   assert r.returncode==0,(r.returncode,r.stderr);assert 'synthetic-' not in r.stdout+r.stderr;return r
- targets=['gh-work','cf-work','cf-personal','browser-test']
+ targets=['gh-work','cf-work','cf-personal','browser-test','portainer-test']
  with (home/'core.log').open('wb') as log:
   process=subprocess.Popen([str(Path(a.core).resolve()),'-config',str(home/'config.yaml'),'--local-model'],cwd=home,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
   try:
@@ -49,6 +49,9 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
    result=subprocess.run([helper,'--data-dir',str(data),'run','--connection','gh-work','--',sys.executable,'-c','import sys;sys.stdout.write(sys.stdin.read());sys.exit(7)'],input='stdio protocol fixture',capture_output=True,text=True)
    assert result.returncode==7 and result.stdout=='stdio protocol fixture' and 'synthetic-' not in result.stderr
    print('PASS: native plugin authentication, public-resource boundary, Windows vault, secret-free catalogue, stale-write rejection, project assignment, concurrent account isolation, stdio and exit-code forwarding',flush=True)
+   from portainer import check
+   check(api,helper,data)
+   state=api('state')
    if a.serve:
     print('CONNECTIONS_BASE='+base,flush=True);print('CONNECTIONS_PROJECT='+str(project),flush=True);process.wait()
    else:

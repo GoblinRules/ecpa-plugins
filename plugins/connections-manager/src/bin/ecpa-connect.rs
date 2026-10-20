@@ -3,7 +3,7 @@ use connections_manager::{
     vault::SystemVault,
 };
 use std::{path::PathBuf, process::Command};
-const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] login-github ID NAME\necpa-connect [--data-dir PATH] import-github ID NAME\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
+const HELP:&str="ECPA Connections Manager\n\necpa-connect [--data-dir PATH] list\necpa-connect [--data-dir PATH] portainer-mcp CONNECTION\necpa-connect [--data-dir PATH] login-github ID NAME\necpa-connect [--data-dir PATH] import-github ID NAME\necpa-connect [--data-dir PATH] check CONNECTION\necpa-connect [--data-dir PATH] run (--connection ID | --project PATH) -- EXECUTABLE [ARGS...]\n\nProject selection includes parent directories (nearest assignment wins).\nFor Wrangler on Windows use node.exe and the absolute path to wrangler/bin/wrangler.js.\nBatch files and shell command strings are not supported. No global login is changed.\nUse an absolute executable path for MCP servers; stdin/stdout and exit status pass through.\n";
 fn run() -> Result<i32, String> {
     let mut args = std::env::args().skip(1).peekable();
     let mut dir = None;
@@ -21,6 +21,14 @@ fn run() -> Result<i32, String> {
         None => store::default_dir()?,
     })?;
     match action.as_str() {
+        "portainer-mcp" => {
+            let id = args.next().ok_or("Supply a Portainer connection ID")?;
+            if args.next().is_some() {
+                return Err("Unexpected arguments".into());
+            }
+            connections_manager::portainer::serve(&store, &id, &SystemVault)?;
+            Ok(0)
+        }
         "login-github" | "import-github" => {
             let id = args.next().ok_or("Supply an account ID and display name")?;
             let name = args
@@ -156,6 +164,7 @@ fn login_github(store: &Store, id: &str, name: &str) -> Result<(), String> {
         name: name.into(),
         service: "github".into(),
         account_id: String::new(),
+        base_url: String::new(),
     };
     store::validate(&connection)?;
     let version = {
@@ -243,6 +252,7 @@ fn import_github(store: &Store, id: &str, name: &str) -> Result<(), String> {
         name: name.into(),
         service: "github".into(),
         account_id: String::new(),
+        base_url: String::new(),
     };
     store::validate(&connection)?;
     let version = {

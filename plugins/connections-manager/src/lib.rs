@@ -1,4 +1,5 @@
 mod native;
+pub mod portainer;
 pub mod store;
 pub mod vault;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -24,6 +25,15 @@ pub fn verify(store: &Store, id: &str, vault: &impl Vault) -> Result<Value, Stri
     let c = store.selected(Some(id), None)?.remove(0);
     let token = vault.read(&store.target(id))?;
     drop(lock);
+    if c.service == "portainer" {
+        let data = portainer::request(&c.base_url, &token, "/endpoints", false)?;
+        let endpoints = data
+            .as_array()
+            .ok_or("Unexpected Portainer environment response")?;
+        return Ok(
+            json!({"id":c.id,"service":"portainer","identity":c.name,"accountId":c.base_url,"message":format!("Token accepted; {} accessible environments. Read-only MCP available.", endpoints.len())}),
+        );
+    }
     let client = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(15))
         .redirects(0)
