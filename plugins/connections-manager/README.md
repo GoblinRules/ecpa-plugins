@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.0.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.1.
 
 ## Install
 
@@ -137,3 +137,5 @@ Under **Settings**, set the shared `ecpa-connect.exe` (or its downloaded `ecpa-c
 The helper location is remembered in browser local storage, shared by this editor's workflows. It is not written into the credential catalogue and is not synced across browsers/devices. Secrets remain in the Windows vault. On another browser, set the path again. The path refers to the plugin host's filesystem; run the helper under the same Windows user as the vault.
 
 The tool generator filters choices by selected account or project. Portainer exposes only the built-in MCP and Codex/Claude formats. GitHub and Cloudflare expose matching CLI presets and advanced local MCP/custom executable options. CLI commands offer PowerShell output only. Changing accounts clears stale generated commands.
+
+Service logos are bundled from [Simple Icons](https://github.com/simple-icons/simple-icons), distributed under CC0-1.0. Brand marks remain the property of their respective owners. No external image requests are needed.

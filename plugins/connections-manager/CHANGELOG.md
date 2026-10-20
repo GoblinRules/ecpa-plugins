@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- Replace account initials with bundled GitHub, Cloudflare and Portainer SVG icons. Icons work offline and in the embedded plugin view.
+
 ## 0.5.0
 
 - Four-step connection wizard with service-specific authentication and fields.
