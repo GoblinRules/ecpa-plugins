@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.1.
+Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.2.
 
 ## Install
 
@@ -139,3 +139,9 @@ The helper location is remembered in browser local storage, shared by this edito
 The tool generator filters choices by selected account or project. Portainer exposes only the built-in MCP and Codex/Claude formats. GitHub and Cloudflare expose matching CLI presets and advanced local MCP/custom executable options. CLI commands offer PowerShell output only. Changing accounts clears stale generated commands.
 
 Service logos are bundled from [Simple Icons](https://github.com/simple-icons/simple-icons), distributed under CC0-1.0. Brand marks remain the property of their respective owners. No external image requests are needed.
+
+## Windows path separators (0.5.2)
+
+The helper and plugin now use the same credential namespace for Windows paths spelled with `\` or `/`. Previously, a forward-slash `--data-dir` could load the catalogue but report its saved token missing. New writes use the backslash namespace; reads also check the old forward-slash namespace and the exact supplied spelling. Existing backslash/forward-slash credentials need no manual migration. Existing legacy entries are updated together on token replacement and removed together on deletion. Conflicting tokens under those spellings are rejected until you explicitly re-save the intended token.
+
+Update **both the plugin and helper**. All credential readers (status, verification, process launcher and Portainer MCP) share this lookup. No tokens are printed or copied into the catalogue. This fix normalizes separator style only: keep directory casing, trailing separators and junction/alias spelling consistent with the original configuration. A legacy mixed-separator entry is found when its exact original spelling is supplied; resaving through that spelling also creates the normalized entry. Moving the catalogue still does not transfer credentials.

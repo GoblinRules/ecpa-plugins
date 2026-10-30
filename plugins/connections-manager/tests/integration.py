@@ -51,6 +51,14 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:list(pool.map(single,['cf-work','cf-personal']))
    result=subprocess.run([helper,'--data-dir',str(data),'run','--connection','gh-work','--',sys.executable,'-c','import sys;sys.stdout.write(sys.stdin.read());sys.exit(7)'],input='stdio protocol fixture',capture_output=True,text=True)
    assert result.returncode==7 and result.stdout=='stdio protocol fixture' and 'synthetic-' not in result.stderr
+   for spelling in [str(data),str(data).replace('\\','/'),str(data).replace('\\','/',1)]:
+    listing=subprocess.run([helper,'--data-dir',spelling,'list'],capture_output=True,text=True,timeout=20)
+    assert listing.returncode==0,listing.stderr
+    assert all(c['hasCredential'] for c in json.loads(listing.stdout)['connections'])
+    child=subprocess.run([helper,'--data-dir',spelling,'run','--connection','gh-work','--',sys.executable,'-c',"import os;assert os.environ['GH_TOKEN']=='synthetic-gh-work'"],capture_output=True,text=True,timeout=20)
+    assert child.returncode==0,child.stderr
+    assert 'synthetic-' not in listing.stdout+listing.stderr+child.stdout+child.stderr
+   print('PASS: native helper reads the same Windows vault credentials with backslash, forward-slash and mixed data directory arguments',flush=True)
    print('PASS: native plugin authentication, public-resource boundary, Windows vault, secret-free catalogue, stale-write rejection, project assignment, concurrent account isolation, stdio and exit-code forwarding',flush=True)
    from portainer import check
    check(api,helper,data)

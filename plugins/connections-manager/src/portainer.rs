@@ -142,7 +142,7 @@ fn call(
     if c.service != "portainer" {
         return Err("Select a Portainer connection".into());
     }
-    let token = vault.read(&store.target(id))?;
+    let token = store.credential(id, vault)?;
     drop(lock);
     let data = request(&c.base_url, &token, &path, logs)?;
     if logs {

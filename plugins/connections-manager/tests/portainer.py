@@ -21,10 +21,13 @@ def check(api, helper, data):
         connection={'id':'portainer-test','name':'Portainer test','service':'portainer','account_id':'','base_url':f'http://127.0.0.1:{server.server_port}'}
         state=api('save',{'version':api('state')['version'],'connection':connection,'token':'synthetic-portainer'})
         assert api('verify',{'id':'portainer-test'})['service']=='portainer'
+        checked=subprocess.run([helper,'--data-dir',str(data).replace('\\','/'),'check','portainer-test'],capture_output=True,text=True,timeout=20)
+        assert checked.returncode==0,checked.stderr
+        assert 'synthetic-portainer' not in checked.stdout+checked.stderr
         messages=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2024-11-05'}},{'jsonrpc':'2.0','method':'notifications/initialized'},{'jsonrpc':'2.0','id':2,'method':'tools/list'}]
         for name,args in [('portainer_environments',{}),('portainer_stacks',{}),('portainer_containers',{'environment_id':1}),('portainer_logs',{'environment_id':1,'container_id':'abcdef123456'}),('portainer_restart',{}),('portainer_logs',{'environment_id':1,'container_id':'../auth'})]:
             messages.append({'jsonrpc':'2.0','id':len(messages),'method':'tools/call','params':{'name':name,'arguments':args}})
-        result=subprocess.run([helper,'--data-dir',str(data),'portainer-mcp','portainer-test'],input='\n'.join(map(json.dumps,messages))+'\n',capture_output=True,text=True,timeout=20)
+        result=subprocess.run([helper,'--data-dir',str(data).replace('\\','/'),'portainer-mcp','portainer-test'],input='\n'.join(map(json.dumps,messages))+'\n',capture_output=True,text=True,timeout=20)
         assert result.returncode==0,result.stderr
         assert 'synthetic-portainer' not in result.stdout+result.stderr
         assert 'never-return' not in result.stdout
@@ -33,7 +36,7 @@ def check(api, helper, data):
         assert all(t['annotations']['readOnlyHint'] for t in replies[1]['result']['tools'])
         assert json.loads(replies[5]['result']['content'][0]['text'])['logs']=='fixture log [REDACTED]\n'
         assert replies[6]['result']['isError'] and replies[7]['result']['isError']
-        assert len(seen)==5,seen
+        assert len(seen)==6,seen
         api('delete',{'version':state['version'],'id':'portainer-test'})
         print('PASS: Portainer vault save/verify, stdio MCP handshake and four read-only tools, metadata filtering, log framing/redaction, blocked write and traversal requests',flush=True)
     finally:

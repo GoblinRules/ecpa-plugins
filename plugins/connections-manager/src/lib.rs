@@ -23,7 +23,7 @@ fn configured() -> Result<Store, String> {
 pub fn verify(store: &Store, id: &str, vault: &impl Vault) -> Result<Value, String> {
     let lock = store.lock(false)?;
     let c = store.selected(Some(id), None)?.remove(0);
-    let token = vault.read(&store.target(id))?;
+    let token = store.credential(id, vault)?;
     drop(lock);
     if c.service == "portainer" {
         let data = portainer::request(&c.base_url, &token, "/endpoints", false)?;

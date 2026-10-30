@@ -22,7 +22,7 @@ mod windows {
             unsafe {
                 if CredReadW(name.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) == 0 {
                     return Err(
-                        "Credential unavailable for this Windows user. Save the token again."
+                        "Credential unavailable for this Windows user and catalogue directory. Check the data directory and Windows user."
                             .into(),
                     );
                 }

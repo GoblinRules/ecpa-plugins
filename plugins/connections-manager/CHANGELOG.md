@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2
+
+- Fix missing credentials when the same Windows data directory uses forward slashes instead of backslashes.
+- Preserve existing legacy slash namespaces; synchronize existing entries on token replacement and deletion with rollback on failure.
+- Refuse ambiguous conflicting tokens rather than selecting one silently.
+- Cover helper listing/launching, account checks and Portainer MCP with separator regression tests.
+- Update both plugin and helper. Directory casing/trailing separators and filesystem aliases remain distinct.
+
 ## 0.5.1
 
 - Replace account initials with bundled GitHub, Cloudflare and Portainer SVG icons. Icons work offline and in the embedded plugin view.

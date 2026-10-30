@@ -90,10 +90,69 @@ impl Store {
         Ok(Self { dir })
     }
     pub fn target(&self, id: &str) -> String {
-        format!(
-            "ECPA/Connections/{:x}/{id}",
-            Sha256::digest(self.dir.to_string_lossy().as_bytes())
-        )
+        let path = self.dir.to_string_lossy();
+        let path = if cfg!(windows) {
+            path.replace('/', "\\")
+        } else {
+            path.into_owned()
+        };
+        credential_target(&path, id)
+    }
+    // Keep old slash-only and exact input spellings readable. Do not enumerate
+    // unrelated vault entries or merge different catalogue directories.
+    fn targets(&self, id: &str) -> Vec<String> {
+        let mut targets = vec![self.target(id)];
+        if cfg!(windows) {
+            let path = self.dir.to_string_lossy();
+            for spelling in [path.to_string(), path.replace('\\', "/")] {
+                let target = credential_target(&spelling, id);
+                if !targets.contains(&target) {
+                    targets.push(target);
+                }
+            }
+        }
+        targets
+    }
+    pub fn credential(&self, id: &str, vault: &impl Vault) -> Result<Zeroizing<String>, String> {
+        let mut found: Option<Zeroizing<String>> = None;
+        for target in self.targets(id) {
+            if let Ok(token) = vault.read(&target) {
+                if found.as_ref().is_some_and(|old| **old != *token) {
+                    return Err("Conflicting credentials for Windows path spellings. Re-save the intended token in Connections Manager before using this account.".into());
+                }
+                found = Some(token);
+            }
+        }
+        found.ok_or("Credential unavailable for this Windows user and catalogue directory. Check --data-dir and the helper's Windows user before re-saving the token.".into())
+    }
+    fn change_credentials(
+        &self,
+        id: &str,
+        token: Option<&str>,
+        vault: &impl Vault,
+    ) -> Result<Vec<CredentialBackup>, String> {
+        let targets = self.targets(id);
+        let backups: Vec<_> = targets
+            .into_iter()
+            .map(|target| {
+                let old = vault.read(&target).ok();
+                (target, old)
+            })
+            .collect();
+        for (index, (target, old)) in backups.iter().enumerate() {
+            // Refresh existing legacy entries too so older helpers cannot read
+            // stale tokens. Only create the normalized entry for new accounts.
+            let result = match token {
+                Some(token) if index == 0 || old.is_some() => vault.write(target, token),
+                Some(_) => Ok(()),
+                None => vault.delete(target),
+            };
+            if let Err(error) = result {
+                restore_credentials(&backups, vault)?;
+                return Err(error);
+            }
+        }
+        Ok(backups)
     }
     pub fn load(&self) -> Result<(Catalogue, String), String> {
         let bytes = match fs::read(self.dir.join("connections.json")) {
@@ -120,7 +179,7 @@ impl Store {
     pub fn state(&self, vault: &impl Vault) -> Result<Value, String> {
         let (data, version) = self.load()?;
         Ok(
-            json!({"connections":data.connections.iter().map(|c|{let mut v=serde_json::to_value(c).unwrap();v["hasCredential"]=json!(vault.read(&self.target(&c.id)).is_ok());v}).collect::<Vec<_>>(),"projects":data.projects,"version":version,"dataDir":self.dir,"platformSupported":cfg!(windows)}),
+            json!({"connections":data.connections.iter().map(|c|{let mut v=serde_json::to_value(c).unwrap();v["hasCredential"]=json!(self.credential(&c.id, vault).is_ok());v}).collect::<Vec<_>>(),"projects":data.projects,"version":version,"dataDir":self.dir,"platformSupported":cfg!(windows)}),
         )
     }
     pub fn lock(&self, exclusive: bool) -> Result<std::fs::File, String> {
@@ -146,7 +205,7 @@ impl Store {
         if body["version"].as_str() != Some(&version) {
             return Err("Connections changed. Reload before saving.".into());
         }
-        let mut rollback: Option<(String, Option<Zeroizing<String>>)> = None;
+        let mut rollback = Vec::new();
 
         match action {
             "save" => {
@@ -170,15 +229,13 @@ impl Store {
                     return Err("Re-enter the token when changing the Portainer URL".into());
                 }
                 let token = body["token"].as_str().unwrap_or("").trim();
-                let target = self.target(&c.id);
                 if !token.is_empty() {
                     if token.len() > 2500 || token.chars().any(char::is_control) {
                         return Err("Invalid token".into());
                     }
-                    rollback = Some((target.clone(), vault.read(&target).ok()));
-                    vault.write(&target, token)?;
-                } else if vault.read(&target).is_err() {
-                    return Err("Enter a token for this connection".into());
+                    rollback = self.change_credentials(&c.id, Some(token), vault)?;
+                } else {
+                    self.credential(&c.id, vault)?;
                 }
                 data.connections.retain(|old| old.id != c.id);
                 data.connections.push(c);
@@ -199,9 +256,7 @@ impl Store {
                     return Err("Connection not found".into());
                 }
                 data.connections.retain(|c| c.id != id);
-                let target = self.target(id);
-                rollback = Some((target.clone(), vault.read(&target).ok()));
-                vault.delete(&target)?;
+                rollback = self.change_credentials(id, None, vault)?;
             }
             "assign" => {
                 let mut p: Assignment = serde_json::from_value(body["project"].clone())
@@ -240,15 +295,7 @@ impl Store {
             Ok(())
         })();
         if let Err(e) = save {
-            if let Some((target, old)) = rollback {
-                let restored = match old {
-                    Some(secret) => vault.write(&target, &secret),
-                    None => vault.delete(&target),
-                };
-                if restored.is_err() {
-                    return Err("Catalogue write and credential rollback failed; re-save the connection token".into());
-                }
-            }
+            restore_credentials(&rollback, vault)?;
             return Err(e);
         }
         self.state(vault)
@@ -299,7 +346,7 @@ pub fn environment(
 ) -> Result<BTreeMap<String, Zeroizing<String>>, String> {
     let mut result = BTreeMap::new();
     for c in connections {
-        let token = vault.read(&store.target(&c.id))?;
+        let token = store.credential(&c.id, vault)?;
         match c.service.as_str() {
             "cloudflare" => {
                 result.insert("CLOUDFLARE_API_TOKEN".into(), token);
@@ -318,4 +365,27 @@ pub fn environment(
         }
     }
     Ok(result)
+}
+
+type CredentialBackup = (String, Option<Zeroizing<String>>);
+fn credential_target(path: &str, id: &str) -> String {
+    format!(
+        "ECPA/Connections/{:x}/{id}",
+        Sha256::digest(path.as_bytes())
+    )
+}
+fn restore_credentials(backups: &[CredentialBackup], vault: &impl Vault) -> Result<(), String> {
+    let mut failed = false;
+    for (target, old) in backups {
+        let result = match old {
+            Some(token) => vault.write(target, token),
+            None => vault.delete(target),
+        };
+        failed |= result.is_err();
+    }
+    if failed {
+        Err("Credential rollback failed; re-save the intended connection token".into())
+    } else {
+        Ok(())
+    }
 }

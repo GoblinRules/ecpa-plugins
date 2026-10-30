@@ -118,3 +118,125 @@ fn windows_vault_roundtrip() {
     assert!(v.read(&target).is_err());
     v.delete(&target).unwrap();
 }
+
+#[cfg(windows)]
+fn legacy_target(path: &str, id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!(
+        "ECPA/Connections/{:x}/{id}",
+        Sha256::digest(path.as_bytes())
+    )
+}
+#[cfg(windows)]
+#[test]
+fn slash_spellings_read_legacy_tokens_and_share_new_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let back = dir.path().join("data").to_string_lossy().to_string();
+    let forward = back.replace('\\', "/");
+    let mixed = back.replacen('\\', "/", 1);
+    let stores: Vec<_> = [&back, &forward, &mixed]
+        .iter()
+        .map(|p| Store::new(PathBuf::from(p)).unwrap())
+        .collect();
+    let v = MemoryVault::default();
+    let state = add(&stores[0], &v, "work", "github");
+    // Simulate v0.5.1 having saved under the forward-slash hash only.
+    v.delete(&stores[0].target("work")).unwrap();
+    let legacy = legacy_target(&forward, "work");
+    v.write(&legacy, "legacy-fixture").unwrap();
+    for s in &stores {
+        assert_eq!(s.target("work"), stores[0].target("work"));
+        assert_eq!(
+            s.state(&v).unwrap()["connections"][0]["hasCredential"],
+            true
+        );
+        let env = store::environment(&s.selected(Some("work"), None).unwrap(), s, &v).unwrap();
+        assert_eq!(&*env["GH_TOKEN"], "legacy-fixture");
+    }
+    let connection = json!({"id":"work","name":"renamed","service":"github","account_id":""});
+    stores[1]
+        .mutate(
+            "save",
+            &json!({"version":state["version"],"connection":connection,"token":""}),
+            &v,
+        )
+        .unwrap();
+    // Replace both normalized and already-existing legacy credentials.
+    stores[1].mutate("save", &json!({"version":stores[0].load().unwrap().1,"connection":connection,"token":"replacement-fixture"}), &v).unwrap();
+    assert_eq!(&*v.read(&legacy).unwrap(), "replacement-fixture");
+    for s in &stores {
+        assert_eq!(&*s.credential("work", &v).unwrap(), "replacement-fixture");
+    }
+    let other = Store::new(dir.path().join("different")).unwrap();
+    assert!(other.credential("work", &v).is_err());
+    stores[2]
+        .mutate(
+            "delete",
+            &json!({"version":stores[0].load().unwrap().1,"id":"work"}),
+            &v,
+        )
+        .unwrap();
+    assert!(v.0.borrow().is_empty());
+    add(&stores[1], &v, "new", "github");
+    assert_eq!(v.0.borrow().len(), 1);
+    assert_eq!(&*stores[0].credential("new", &v).unwrap(), "fixture-secret");
+}
+#[cfg(windows)]
+#[test]
+fn conflicting_path_tokens_require_explicit_resolution() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::new(dir.path().to_path_buf()).unwrap();
+    let v = MemoryVault::default();
+    add(&s, &v, "work", "github");
+    let legacy = legacy_target(&s.dir.to_string_lossy().replace('\\', "/"), "work");
+    v.write(&legacy, "different-fixture").unwrap();
+    assert!(s
+        .credential("work", &v)
+        .unwrap_err()
+        .contains("Conflicting"));
+    let c = json!({"id":"work","name":"work","service":"github","account_id":""});
+    assert!(s
+        .mutate(
+            "save",
+            &json!({"version":s.load().unwrap().1,"connection":c,"token":""}),
+            &v
+        )
+        .is_err());
+    s.mutate(
+        "save",
+        &json!({"version":s.load().unwrap().1,"connection":c,"token":"chosen-fixture"}),
+        &v,
+    )
+    .unwrap();
+    assert_eq!(&*s.credential("work", &v).unwrap(), "chosen-fixture");
+}
+#[cfg(windows)]
+#[test]
+fn failed_catalogue_save_restores_all_path_credentials() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::new(dir.path().to_path_buf()).unwrap();
+    let v = MemoryVault::default();
+    add(&s, &v, "work", "github");
+    let legacy = legacy_target(&s.dir.to_string_lossy().replace('\\', "/"), "work");
+    v.write(&legacy, "fixture-secret").unwrap();
+    // Windows denies replacement while this handle disallows deletion.
+    use std::os::windows::fs::OpenOptionsExt;
+    let handle = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(s.dir.join("connections.json"))
+        .unwrap();
+    let version = s.load().unwrap().1;
+    for (action, body) in [
+        (
+            "save",
+            json!({"version":version,"connection":{"id":"work","name":"work","service":"github","account_id":""},"token":"replacement-fixture"}),
+        ),
+        ("delete", json!({"version":version,"id":"work"})),
+    ] {
+        assert!(s.mutate(action, &body, &v).is_err());
+        assert_eq!(&*v.read(&legacy).unwrap(), "fixture-secret");
+        assert_eq!(&*v.read(&s.target("work")).unwrap(), "fixture-secret");
+    }
+    drop(handle);
+}
