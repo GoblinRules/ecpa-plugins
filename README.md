@@ -14,6 +14,9 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Available plugins
 
+- **[Claude Remote Login](plugins/claude-remote-login/README.md)** — Review and confirm a Claude account before adding it to ECPA, with protected reauthorisation.
+- **[Z.ai Provider](plugins/zai-provider/README.md)** — Existing Coding Plan keys and explicitly configured optional browser login; no automatic key creation or client impersonation. Live provider/billing compatibility remains unverified.
+
 - **[Connections Manager](plugins/connections-manager/README.md)** — Named Cloudflare/GitHub accounts in Windows Credential Manager, project assignments and a CLI/MCP launcher shared across agents.
 
 - **[Agent Instructions](plugins/agent-instructions/README.md)** — edit global instructions for Claude Code, Codex, Kimi Code, Grok Build, ZCode, and Antigravity. Includes backups, restore, conflict detection, and optional remembered login. Windows x64; tested with CLIProxyAPI v8.0.29.
@@ -42,6 +45,9 @@ Source and shared libraries stay here. Each plugin has its own public release re
 - [prompt-library](https://github.com/GoblinRules/ecpa-prompt-library/releases)
 - [config-snapshots](https://github.com/GoblinRules/ecpa-config-snapshots/releases)
 - [agent-skills](https://github.com/GoblinRules/ecpa-agent-skills/releases)
+- [connections-manager](https://github.com/GoblinRules/ecpa-connections-manager/releases)
+- [claude-remote-login](https://github.com/GoblinRules/ecpa-claude-remote-login/releases)
+- [zai-provider](https://github.com/GoblinRules/ecpa-zai-provider/releases)
 
 The migration uses 0.6.2 once for all seven to preserve upgrades from 0.6.1. Future releases advance independently. Your registry URL and saved configuration stay the same.
 
@@ -71,10 +77,12 @@ dist/                             Generated release ZIPs (not committed)
 
 ## Development
 
+The two provider adaptations have a [security review and remaining limits](docs/provider-security-review.md).
+
 See the [2026-10-17 compatibility review](docs/compatibility.md) for the updated
 plugin contract, lifecycle handling and real-core verification on CLIProxyAPI v8.0.32.
 
-Requires Rust stable, a native linker, and Python 3.11+.
+Requires Rust stable, a native linker, and Python 3.11+. The two Go plugins also require the pinned [Go/Zig toolchain](docs/go-plugins.md); run `python scripts/setup_go.py` then `python scripts/check_go.py` before packaging them.
 
 ```powershell
 python scripts/validate.py

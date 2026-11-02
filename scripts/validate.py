@@ -24,16 +24,28 @@ def catalogue(root=ROOT):
         assert repository not in repositories, 'Each plugin needs its own release repository'
         repositories.add(repository)
         directory = root / 'plugins' / plugin_id
-        package = tomllib.loads((directory / 'Cargo.toml').read_text(encoding='utf-8'))
-        assert package['package']['name'] == plugin_id
-        version = package['package']['version']
+        manifest = directory / 'plugin.toml'
+        if manifest.exists():
+            package = tomllib.loads(manifest.read_text(encoding='utf-8'))['plugin']
+            assert package['id'] == plugin_id and package['language'] == 'go'
+            assert (directory / 'go.mod').is_file() and (directory / 'LICENSE').is_file()
+            language = 'go'
+        else:
+            cargo = tomllib.loads((directory / 'Cargo.toml').read_text(encoding='utf-8'))
+            package = cargo['package']
+            assert package['name'] == plugin_id
+            assert 'cdylib' in cargo['lib']['crate-type']
+            assert 'name' not in cargo['lib'], 'Use the default library name for packaging'
+            language = 'rust'
+        version = package['version']
         assert isinstance(version, str) and re.fullmatch(r'\d+\.\d+\.\d+', version), 'Each plugin needs an explicit numeric version'
-        assert package['package']['repository'] == repository, 'Runtime and store repositories must agree'
-        assert 'cdylib' in package['lib']['crate-type']
-        assert 'name' not in package['lib'], 'Use the default library name for packaging'
+        if language == 'go':
+            runtime_versions = re.findall(r'\bpluginVersion\s*=\s*"([^"]+)"', '\n'.join(p.read_text(encoding='utf-8') for p in directory.glob('*.go') if not p.name.endswith('_test.go')))
+            assert runtime_versions == [version], 'Go runtime and manifest versions must agree'
+        assert package['repository'] == repository, 'Runtime and store repositories must agree'
         assert (directory / 'README.md').is_file(), 'Missing plugin README'
-        result.append({**entry, 'version': version})
-    directories = {p.parent.name for p in (root / 'plugins').glob('*/Cargo.toml')}
+        result.append({**entry, 'version': version, 'language': language})
+    directories = {p.parent.name for pattern in ['*/Cargo.toml', '*/plugin.toml'] for p in (root / 'plugins').glob(pattern)}
     assert directories == seen, 'Every plugin must have a registry entry'
     return result
 

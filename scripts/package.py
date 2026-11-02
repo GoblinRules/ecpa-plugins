@@ -8,12 +8,16 @@ import shutil
 import subprocess
 import zipfile
 from validate import ROOT, select_plugins
+from go_build import build_go
 
 def package(plugin=None):
     entries = select_plugins(plugin)
-    command = ['cargo', 'build', '--release', '--locked']
-    command += ['-p', plugin] if plugin else ['--workspace']
-    subprocess.run(command, cwd=ROOT, check=True)
+    rust_entries = [entry for entry in entries if entry.get('language', 'rust') == 'rust']
+    if rust_entries:
+        command = ['cargo', 'build', '--release', '--locked']
+        command += ['-p', plugin] if plugin else ['--workspace']
+        subprocess.run(command, cwd=ROOT, check=True)
+    go_binaries = {entry['id']: build_go(entry) for entry in entries if entry.get('language') == 'go'}
     # Build the CLI without its own payload first, then embed that exact executable
     # in the library. The ZIP stays DLL-only for existing ECPA installers.
     if any(entry['id'] == 'connections-manager' for entry in entries):
@@ -33,12 +37,16 @@ def package(plugin=None):
     outputs = []
     for entry in entries:
         plugin_id, version = entry['id'], entry['version']
-        binary = ROOT / 'target/release' / f"{prefix}{plugin_id.replace('-', '_')}.{extension}"
+        binary = go_binaries.get(plugin_id) or ROOT / 'target/release' / f"{prefix}{plugin_id.replace('-', '_')}.{extension}"
         dist = ROOT / 'dist' / plugin_id
         dist.mkdir(parents=True, exist_ok=True)
         archive = dist / f'{plugin_id}_{version}_{os_name}_{arch}.zip'
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as out:
             out.write(binary, f'{plugin_id}.{extension}')
+            if entry.get('language') == 'go':
+                for name in ['LICENSE', 'UPSTREAM-LICENSE', 'UPSTREAM.md', 'SECURITY.md', 'THIRD_PARTY_NOTICES.md']:
+                    notice = ROOT / 'plugins' / plugin_id / name
+                    if notice.exists(): out.write(notice, name)
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         checksums = dist / 'checksums.txt'
         checksum_lines = [f'{digest}  {archive.name}\n']

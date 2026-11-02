@@ -121,6 +121,32 @@
         "Credentials"
       ],
       "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/connections-manager.svg"
+    },
+    {
+      "id": "claude-remote-login",
+      "name": "Claude Remote Login",
+      "description": "Review and confirm a Claude login from another device before adding it to the proxy account pool.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-claude-remote-login",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/claude-remote-login",
+      "license": "MIT",
+      "tags": [
+        "Authentication",
+        "Management"
+      ]
+    },
+    {
+      "id": "zai-provider",
+      "name": "Z.ai Provider",
+      "description": "Connect existing Z.ai Coding Plan keys, with private logging and explicitly configured optional browser login.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-zai-provider",
+      "homepage": "https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/zai-provider",
+      "license": "MIT",
+      "tags": [
+        "Authentication",
+        "Management"
+      ]
     }
   ]
 }

@@ -1,0 +1,500 @@
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginabi"
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
+)
+
+// Login flow parameters: the upstream expiry governs the flow lifetime; the
+// poll interval is respected and capped so host polls stay polite.
+const (
+	defaultLoginTTL  = 5 * time.Minute
+	defaultPollEvery = 3 * time.Second
+	maxPollEvery     = 30 * time.Second
+)
+
+func init() {
+	registerHandler(pluginabi.MethodAuthIdentifier, handleAuthIdentifier)
+	registerHandler(pluginabi.MethodAuthParse, handleAuthParse)
+	registerHandler(pluginabi.MethodAuthLoginStart, handleAuthLoginStart)
+	registerHandler(pluginabi.MethodAuthLoginPoll, handleAuthLoginPoll)
+	registerHandler(pluginabi.MethodAuthRefresh, handleAuthRefresh)
+}
+
+func handleAuthIdentifier([]byte) (any, error) {
+	return map[string]string{"identifier": providerID}, nil
+}
+
+// loginFlow is the plugin-side state of one provider-hosted login: the shared
+// CPA/z.ai state is the public key, the poll token is the upstream secret.
+type loginFlow struct {
+	pollToken    string
+	flowID       string
+	expiresAt    time.Time
+	pollInterval time.Duration
+	lastPoll     time.Time
+	inFlight     bool
+	settings     pluginSettings
+}
+
+var (
+	flowsMu sync.Mutex
+	flows   = map[string]*loginFlow{}
+)
+
+func expireFlowsLocked() {
+	now := time.Now()
+	for state, flow := range flows {
+		if now.After(flow.expiresAt) {
+			delete(flows, state)
+		}
+	}
+}
+
+type authStartRequest struct {
+	pluginapi.AuthLoginStartRequest
+	HostCallbackID string `json:"host_callback_id"`
+}
+
+type authPollRequest struct {
+	pluginapi.AuthLoginPollRequest
+	HostCallbackID string `json:"host_callback_id"`
+}
+
+type authRefreshRequest struct {
+	pluginapi.AuthRefreshRequest
+	HostCallbackID string `json:"host_callback_id"`
+}
+
+// cliInitResponse is the upstream envelope of POST cliInitURL (third-party
+// report, see docs/compatibility.md).
+type cliInitResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		FlowID          string `json:"flow_id"`
+		AuthorizeURL    string `json:"authorize_url"`
+		ExpiresAt       any    `json:"expires_at"`
+		PollIntervalSec int    `json:"poll_interval_sec"`
+	} `json:"data"`
+}
+
+type cliPollResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		Status         string `json:"status"`
+		Token          string `json:"token"`
+		ZaiAccessToken string `json:"zai.access_token"`
+		Zai            struct {
+			AccessToken string `json:"access_token"`
+		} `json:"zai"`
+		User map[string]any `json:"user"`
+	} `json:"data"`
+}
+
+type bizLoginResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		AccessToken string `json:"access_token"`
+	} `json:"data"`
+}
+
+type customerInfoResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		Organizations []struct {
+			OrganizationID string `json:"organizationId"`
+			ID             string `json:"id"`
+			IsDefault      bool   `json:"isDefault"`
+			Projects       []struct {
+				ProjectID string `json:"projectId"`
+				ID        string `json:"id"`
+			} `json:"projects"`
+		} `json:"organizations"`
+	} `json:"data"`
+}
+
+func randomHex(bytes int) (string, error) {
+	buf := make([]byte, bytes)
+	if _, errRead := rand.Read(buf); errRead != nil {
+		return "", fmt.Errorf("generate random token: %w", errRead)
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+// parseUpstreamExpiry accepts the reported expires_at as RFC3339 text or unix
+// seconds; absent or unreadable values fall back to the default TTL.
+func parseUpstreamExpiry(value any) (time.Time, bool) {
+	switch reported := value.(type) {
+	case string:
+		if reported == "" {
+			return time.Time{}, false
+		}
+		if parsed, errParse := time.Parse(time.RFC3339, reported); errParse == nil {
+			return parsed, true
+		}
+		if secs, errParse := strconv.ParseInt(reported, 10, 64); errParse == nil {
+			return time.Unix(secs, 0), true
+		}
+	case float64:
+		return time.Unix(int64(reported), 0), true
+	}
+	return time.Time{}, false
+}
+
+func handleAuthLoginStart(payload []byte) (result any, err error) {
+	cfg := settingsSnapshot()
+	if !cfg.EnableBrowserLogin {
+		return nil, pluginabi.NewError("disabled", "Browser login is disabled. Use the Z.ai Provider setup page with an existing API key.", 403)
+	}
+	var req authStartRequest
+	if errUnmarshal := json.Unmarshal(payload, &req); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode auth.login.start request: %w", errUnmarshal)
+	}
+	defer func() {
+		if err != nil {
+			hostLog(req.HostCallbackID, "error", "z.ai OAuth login start failed", map[string]any{"error": err.Error()})
+			return
+		}
+		hostLog(req.HostCallbackID, "info", "z.ai OAuth login started", nil)
+	}()
+	pollToken, errToken := randomHex(32)
+	if errToken != nil {
+		return nil, errToken
+	}
+	body, _ := json.Marshal(map[string]string{"provider": providerID})
+	resp, errDo := hostDo(req.HostCallbackID, http.MethodPost, cliInitURL, map[string][]string{
+		"Authorization": {"Bearer " + pollToken},
+		"Content-Type":  {"application/json"},
+	}, body)
+	if errDo != nil {
+		return nil, errDo
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, upstreamError(resp.StatusCode, resp.Body, pollToken)
+	}
+	var init cliInitResponse
+	if errUnmarshal := json.Unmarshal(resp.Body, &init); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode z.ai cli init response: %w", errUnmarshal)
+	}
+	if init.Code != 0 {
+		return nil, fmt.Errorf("z.ai cli init failed: %s", upstreamErrorDetail(resp.Body, pollToken))
+	}
+	if init.Data.FlowID == "" || init.Data.AuthorizeURL == "" {
+		return nil, fmt.Errorf("z.ai cli init response missing flow_id or authorize_url")
+	}
+	authorizeURL, errParseURL := url.Parse(init.Data.AuthorizeURL)
+	if errParseURL != nil || authorizeURL.Scheme != "https" || authorizeURL.User != nil || authorizeURL.Fragment != "" || (authorizeURL.Host != "zcode.z.ai" && authorizeURL.Host != "api.z.ai") {
+		return nil, fmt.Errorf("z.ai cli init returned an invalid authorize url")
+	}
+	state := authorizeURL.Query().Get("state")
+	if state == "" {
+		return nil, fmt.Errorf("z.ai cli init response missing state")
+	}
+	expiresAt := time.Now().Add(defaultLoginTTL)
+	if parsed, ok := parseUpstreamExpiry(init.Data.ExpiresAt); ok && parsed.After(time.Now()) && parsed.Before(time.Now().Add(24*time.Hour)) {
+		expiresAt = parsed
+	}
+	interval := time.Duration(init.Data.PollIntervalSec) * time.Second
+	if interval <= 0 {
+		interval = defaultPollEvery
+	}
+	if interval > maxPollEvery {
+		interval = maxPollEvery
+	}
+	flowsMu.Lock()
+	expireFlowsLocked()
+	if len(flows) >= 128 {
+		flowsMu.Unlock()
+		return nil, fmt.Errorf("too many pending login sessions")
+	}
+	flows[state] = &loginFlow{
+		pollToken:    pollToken,
+		flowID:       init.Data.FlowID,
+		settings:     cfg,
+		expiresAt:    expiresAt,
+		pollInterval: interval,
+	}
+	flowsMu.Unlock()
+	// The flows map is the single holder of the poll credential; nothing that
+	// reaches the browser may carry the upstream poll token or flow id.
+	return pluginapi.AuthLoginStartResponse{
+		Provider:  providerID,
+		URL:       init.Data.AuthorizeURL,
+		State:     state,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+// handleAuthLoginPoll applies the rate limit and single-flight gates, then
+// exchanges at most once per flow. The flow is consumed on success only.
+func handleAuthLoginPoll(payload []byte) (result any, err error) {
+	var req authPollRequest
+	if errUnmarshal := json.Unmarshal(payload, &req); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode auth.login.poll request: %w", errUnmarshal)
+	}
+	defer func() {
+		if err != nil {
+			hostLog(req.HostCallbackID, "error", "z.ai OAuth login failed", map[string]any{"error": err.Error()})
+			return
+		}
+		var status pluginapi.AuthLoginStatus
+		var message string
+		switch resp := result.(type) {
+		case pluginapi.AuthLoginPollResponse:
+			status, message = resp.Status, resp.Message
+		case *pluginapi.AuthLoginPollResponse:
+			status, message = resp.Status, resp.Message
+		}
+		switch status {
+		case pluginapi.AuthLoginStatusSuccess:
+			hostLog(req.HostCallbackID, "info", "z.ai OAuth login succeeded", nil)
+		case pluginapi.AuthLoginStatusError:
+			hostLog(req.HostCallbackID, "error", "z.ai OAuth login failed", map[string]any{"error": message})
+		}
+	}()
+	flowsMu.Lock()
+	flow, ok := flows[req.State]
+	if !ok {
+		flowsMu.Unlock()
+		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "z.ai login flow not found"}, nil
+	}
+	if time.Now().After(flow.expiresAt) {
+		delete(flows, req.State)
+		flowsMu.Unlock()
+		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "z.ai login flow expired"}, nil
+	}
+	if flow.inFlight || (!flow.lastPoll.IsZero() && time.Since(flow.lastPoll) < flow.pollInterval) {
+		flowsMu.Unlock()
+		return pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusPending}, nil
+	}
+	flow.lastPoll = time.Now()
+	flow.inFlight = true
+	flowsMu.Unlock()
+
+	resp, errExchange, consumed := exchangeLoginPoll(req.HostCallbackID, flow)
+	flowsMu.Lock()
+	flow.inFlight = false
+	if flows[req.State] != flow || time.Now().After(flow.expiresAt) {
+		delete(flows, req.State)
+		flowsMu.Unlock()
+		return nil, fmt.Errorf("login cancelled, expired or settings changed; nothing saved")
+	}
+	if consumed {
+		delete(flows, req.State)
+	}
+	flowsMu.Unlock()
+	if errExchange != nil {
+		return nil, errExchange
+	}
+	return resp, nil
+}
+
+// exchangeLoginPoll runs one upstream poll exchange. consumed reports a
+// completed sign-in so the caller can delete the flow (single consumption).
+func exchangeLoginPoll(callbackID string, flow *loginFlow) (resp *pluginapi.AuthLoginPollResponse, err error, consumed bool) {
+	pollHTTP, errDo := hostDo(callbackID, http.MethodGet, cliPollURL+url.PathEscape(flow.flowID),
+		map[string][]string{"Authorization": {"Bearer " + flow.pollToken}}, nil)
+	if errDo != nil {
+		return nil, errDo, false
+	}
+	if pollHTTP.StatusCode < 200 || pollHTTP.StatusCode > 299 {
+		message := upstreamError(pollHTTP.StatusCode, pollHTTP.Body, flow.pollToken)
+		return &pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "z.ai poll failed: " + message.Error()}, nil, false
+	}
+	var poll cliPollResponse
+	if errUnmarshal := json.Unmarshal(pollHTTP.Body, &poll); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode z.ai poll response: %w", errUnmarshal), false
+	}
+	if poll.Code != 0 {
+		return pollError("z.ai poll failed: %s", pollHTTP.Body, flow.pollToken), nil, false
+	}
+	if poll.Data.Status != "ready" {
+		return &pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusPending}, nil, false
+	}
+	oauthToken := poll.Data.ZaiAccessToken
+	if oauthToken == "" {
+		oauthToken = poll.Data.Zai.AccessToken
+	}
+	if poll.Data.Token == "" || oauthToken == "" {
+		return &pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "z.ai poll response is ready but carries no tokens"}, nil, false
+	}
+	bizToken, respFail, errBiz := exchangeBusinessLogin(callbackID, oauthToken)
+	if errBiz != nil {
+		return nil, errBiz, false
+	}
+	if respFail != nil {
+		return respFail, nil, false
+	}
+	if !strings.EqualFold(pollUserField(poll.Data.User, "email", "userName", "name"), flow.settings.ExpectedAccount) && pollUserField(poll.Data.User, "id", "user_id") != flow.settings.ExpectedAccount {
+		return pollError("%s", []byte("account mismatch")), fmt.Errorf("signed-in account does not match the configured account; nothing saved"), true
+	}
+	orgID, projectID, orgErr := fetchSelectedOrg(callbackID, bizToken, flow.settings)
+	if orgErr != nil {
+		return nil, orgErr, true
+	}
+	apiKey, errKey := existingAPIKey(callbackID, bizToken, orgID, projectID, flow.settings.APIKeyName)
+	if errKey != nil {
+		return &pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: errKey.Error()}, nil, false
+	}
+	storage := zaiStorage{
+		Version:          storageVersion,
+		Type:             providerID,
+		OAuthAccessToken: oauthToken,
+		ZcodeJWT:         poll.Data.Token,
+		BizAccessToken:   bizToken,
+		APIKey:           apiKey,
+		Email:            pollUserField(poll.Data.User, "email", "userName", "name"),
+		UserID:           pollUserField(poll.Data.User, "id", "user_id"),
+		OrganizationID:   orgID,
+		ProjectID:        projectID,
+		ObtainedAt:       nowRFC3339(),
+	}
+	raw, _ := json.Marshal(storage)
+	id := storage.authID()
+	return &pluginapi.AuthLoginPollResponse{
+		Status:  pluginapi.AuthLoginStatusSuccess,
+		Message: "z.ai sign-in complete",
+		Auth: pluginapi.AuthData{
+			Provider:    providerID,
+			ID:          id,
+			FileName:    id + ".json",
+			Label:       "Z.ai " + storage.accountLabel(),
+			StorageJSON: raw,
+			Metadata: map[string]any{
+				"type":            providerID,
+				"organization_id": orgID,
+				"project_id":      projectID,
+			},
+		},
+	}, nil, true
+}
+
+func pollError(format string, body []byte, secrets ...string) *pluginapi.AuthLoginPollResponse {
+	return &pluginapi.AuthLoginPollResponse{
+		Status:  pluginapi.AuthLoginStatusError,
+		Message: fmt.Sprintf(format, upstreamErrorDetail(body, secrets...)),
+	}
+}
+
+// exchangeBusinessLogin swaps the z.ai OAuth token for the durable business
+// token. The upstream envelope reports code 200 (0 accepted defensively).
+func exchangeBusinessLogin(callbackID, oauthToken string) (bizToken string, respFail *pluginapi.AuthLoginPollResponse, err error) {
+	body, _ := json.Marshal(map[string]string{"token": oauthToken})
+	bizHTTP, errDo := hostDo(callbackID, http.MethodPost, businessLoginURL,
+		map[string][]string{"Content-Type": {"application/json"}}, body)
+	if errDo != nil {
+		return "", nil, errDo
+	}
+	if bizHTTP.StatusCode < 200 || bizHTTP.StatusCode > 299 {
+		return "", pollError("z.ai sign-in failed: %s", bizHTTP.Body, oauthToken), nil
+	}
+	var biz bizLoginResponse
+	if errUnmarshal := json.Unmarshal(bizHTTP.Body, &biz); errUnmarshal != nil {
+		return "", nil, fmt.Errorf("decode z.ai business login response: %w", errUnmarshal)
+	}
+	if biz.Code != 0 && biz.Code != 200 {
+		return "", pollError("z.ai sign-in failed: %s", bizHTTP.Body, oauthToken), nil
+	}
+	if biz.Data.AccessToken == "" {
+		return "", &pluginapi.AuthLoginPollResponse{Status: pluginapi.AuthLoginStatusError, Message: "z.ai sign-in response carries no business token"}, nil
+	}
+	return biz.Data.AccessToken, nil, nil
+}
+
+// Verify the explicitly configured organisation/project, never choose a default.
+func fetchSelectedOrg(callbackID, bizToken string, cfg pluginSettings) (string, string, error) {
+	response, err := hostDo(callbackID, http.MethodGet, customerInfoURL, map[string][]string{"Authorization": {"Bearer " + bizToken}}, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot verify selected organisation/project")
+	}
+	var info customerInfoResponse
+	if response.StatusCode != 200 || json.Unmarshal(response.Body, &info) != nil || (info.Code != 0 && info.Code != 200) {
+		return "", "", fmt.Errorf("cannot verify selected organisation/project")
+	}
+	for _, org := range info.Data.Organizations {
+		id := org.OrganizationID
+		if id == "" {
+			id = org.ID
+		}
+		if id != cfg.OrganizationID {
+			continue
+		}
+		for _, p := range org.Projects {
+			pid := p.ProjectID
+			if pid == "" {
+				pid = p.ID
+			}
+			if pid == cfg.ProjectID {
+				return id, pid, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("selected organisation/project is not available to this account; nothing saved")
+}
+
+func pollUserField(user map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := user[key].(string); ok && value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+// handleAuthParse accepts only records that decode into the zai storage schema.
+func handleAuthParse(payload []byte) (any, error) {
+	var req pluginapi.AuthParseRequest
+	if errUnmarshal := json.Unmarshal(payload, &req); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode auth.parse request: %w", errUnmarshal)
+	}
+	storage, errParse := parseZaiStorage(req.RawJSON)
+	if errParse != nil {
+		return pluginapi.AuthParseResponse{Handled: false}, nil
+	}
+	return pluginapi.AuthParseResponse{Handled: true, Auth: authDataFromStorage(storage)}, nil
+}
+
+func authDataFromStorage(storage *zaiStorage) pluginapi.AuthData {
+	raw, _ := json.Marshal(storage)
+	id := storage.authID()
+	return pluginapi.AuthData{
+		Provider:    providerID,
+		ID:          id,
+		FileName:    id + ".json",
+		Label:       "Z.ai " + storage.accountLabel(),
+		StorageJSON: raw,
+		Metadata: map[string]any{
+			"type":            providerID,
+			"organization_id": storage.OrganizationID,
+			"project_id":      storage.ProjectID,
+		},
+	}
+}
+
+// handleAuthRefresh deliberately makes zero upstream calls: z.ai offers no
+// verified refresh mechanism. Renewal requires a new browser sign-in.
+func handleAuthRefresh(payload []byte) (any, error) {
+	var req authRefreshRequest
+	if errUnmarshal := json.Unmarshal(payload, &req); errUnmarshal != nil {
+		return nil, fmt.Errorf("decode auth.refresh request: %w", errUnmarshal)
+	}
+	if _, errParse := parseZaiStorage(req.StorageJSON); errParse != nil {
+		return nil, errParse
+	}
+	return nil, pluginabi.NewError("unsupported_operation", "z.ai login renewal requires a new browser sign-in", 501)
+}

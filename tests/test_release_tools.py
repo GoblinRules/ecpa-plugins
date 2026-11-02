@@ -41,8 +41,11 @@ class ReleaseToolsTest(unittest.TestCase):
                     continue
                 dest = root / 'plugins' / source.name
                 dest.mkdir(parents=True)
-                for name in ['Cargo.toml', 'README.md']:
+                for name in ['Cargo.toml', 'plugin.toml', 'go.mod', 'LICENSE', 'README.md']:
+                    if not (source / name).exists(): continue
                     shutil.copy2(source / name, dest)
+                for go_file in source.glob('*.go'):
+                    shutil.copy2(go_file, dest)
             before = {e['id']: e['version'] for e in validate.catalogue(root)}
             manifest = root / 'plugins/mcp-manager/Cargo.toml'
             manifest.write_text(manifest.read_text().replace(f'version = "{before["mcp-manager"]}"', 'version = "1.2.3"'))
@@ -54,6 +57,24 @@ class ReleaseToolsTest(unittest.TestCase):
     def test_unknown_plugin_is_rejected_before_build(self):
         with self.assertRaises(ValueError):
             validate.select_plugins('../not-a-plugin')
+
+    def test_go_package_keeps_notices_and_uses_native_builder(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'plugins/claude-remote-login'
+            source.mkdir(parents=True)
+            for name in ['LICENSE', 'UPSTREAM-LICENSE', 'UPSTREAM.md', 'SECURITY.md']:
+                (source / name).write_text('fixture '+name)
+            binary = root / 'native.dll'
+            binary.write_bytes(b'fixture native DLL')
+            entry = {'id': 'claude-remote-login', 'version': '1.1.0', 'language': 'go', 'repository': 'https://github.com/GoblinRules/ecpa-claude-remote-login'}
+            with patch.object(package, 'ROOT', root), patch.object(package, 'select_plugins', return_value=[entry]), patch.object(package, 'build_go', return_value=binary) as build, patch.object(package.subprocess, 'run') as run, patch.object(package.subprocess, 'check_output', return_value='a'*40), patch.object(package.platform, 'system', return_value='Windows'), patch.object(package.platform, 'machine', return_value='AMD64'):
+                _, assets = package.package(entry['id'])[0]
+                build.assert_called_once_with(entry)
+                run.assert_not_called()
+            with zipfile.ZipFile(assets[0]) as archive:
+                self.assertEqual(set(archive.namelist()), {'claude-remote-login.dll', 'LICENSE', 'UPSTREAM-LICENSE', 'UPSTREAM.md', 'SECURITY.md'})
+            self.assertEqual(json.loads(assets[2].read_text())['version'], '1.1.0')
 
     def test_selected_package_uses_own_version_and_only_its_binary(self):
         with tempfile.TemporaryDirectory() as temp:
