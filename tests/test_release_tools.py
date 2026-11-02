@@ -13,7 +13,7 @@ import package
 
 
 class ReleaseToolsTest(unittest.TestCase):
-    def test_connections_helper_is_separate_and_checksummed(self):
+    def test_connections_helper_is_embedded_and_still_available_as_checksummed_asset(self):
         import hashlib
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -22,8 +22,11 @@ class ReleaseToolsTest(unittest.TestCase):
             (binaries / 'connections_manager.dll').write_bytes(b'fixture DLL')
             (binaries / 'ecpa-connect.exe').write_bytes(b'fixture helper')
             entry = {'id': 'connections-manager', 'version': '0.1.0', 'repository': 'https://github.com/GoblinRules/ecpa-connections-manager'}
-            with patch.object(package, 'ROOT', root), patch.object(package, 'select_plugins', return_value=[entry]), patch.object(package.platform, 'system', return_value='Windows'), patch.object(package.platform, 'machine', return_value='AMD64'), patch.object(package.subprocess, 'run'), patch.object(package.subprocess, 'check_output', return_value='a' * 40):
+            with patch.object(package, 'ROOT', root), patch.object(package, 'select_plugins', return_value=[entry]), patch.object(package.platform, 'system', return_value='Windows'), patch.object(package.platform, 'machine', return_value='AMD64'), patch.object(package.subprocess, 'run') as run, patch.object(package.subprocess, 'check_output', side_effect=[json.dumps({'name':'ecpa-connect','version':'0.1.0'}), 'a' * 40]):
                 _, assets = package.package('connections-manager')[0]
+                self.assertEqual(run.call_count, 2)
+                self.assertEqual(run.call_args.args[0][-3:], ['--lib', '--features', 'bundled-helper'])
+                self.assertEqual(run.call_args.kwargs['env']['ECPA_HELPER_BINARY'], str((binaries / 'ecpa-connect.exe').resolve()))
             with zipfile.ZipFile(assets[0]) as archive:
                 self.assertEqual(archive.namelist(), ['connections-manager.dll'])
             self.assertEqual(assets[3].name, 'ecpa-connect_windows_amd64.exe')

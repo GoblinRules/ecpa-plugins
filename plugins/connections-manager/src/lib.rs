@@ -1,3 +1,4 @@
+mod helper;
 mod native;
 pub mod portainer;
 pub mod store;
@@ -19,6 +20,11 @@ fn configured() -> Result<Store, String> {
         .lock()
         .map_err(|_| "Restart the core")?;
     Store::new(guard.clone().ok_or("Plugin is not configured")?)
+}
+fn editor_state(store: &Store) -> Result<Value, String> {
+    let mut state = store.state(&SystemVault)?;
+    state["helper"] = helper::status();
+    Ok(state)
 }
 pub fn verify(store: &Store, id: &str, vault: &impl Vault) -> Result<Value, String> {
     let lock = store.lock(false)?;
@@ -101,6 +107,9 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                     .get_or_init(|| Mutex::new(None))
                     .lock()
                     .map_err(|_| "Restart the core")? = Some(store.dir);
+                // A locked executable must not prevent account management from loading.
+                // Settings exposes its state and an authenticated retry action.
+                let _ = helper::install();
                 json!({"schema_version":6,"metadata":{"Name":"Connections Manager","Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":env!("CARGO_PKG_REPOSITORY"),"Logo":"https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/connections-manager.svg","ConfigFields":[{"Name":"data_dir","Type":"string","Description":"Absolute catalogue directory. Leave blank for LocalAppData/ECPA/connections-manager. The helper must use the same directory and Windows user. Never put tokens here."}]},"capabilities":{"management_api":true}})
             }
             "plugin.quiesce" => json!({}),
@@ -112,7 +121,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 json!({})
             }
             "management.register" => {
-                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and project connections"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")}]})
+                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and project connections"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")},{"Method":"POST","Path":format!("{API}/helper-install")}]})
             }
             "management.handle" => {
                 let req: Value = serde_json::from_slice(raw).map_err(|_| "Invalid request")?;
@@ -125,11 +134,18 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                         include_bytes!("../web/editor.html"),
                     )
                 } else if verb == "GET" && path == format!("{API}/state") {
-                    response(configured().and_then(|s| s.state(&SystemVault)))
+                    response(configured().and_then(|s| editor_state(&s)))
                 } else if verb == "POST"
-                    && ["save", "delete", "assign", "verify", "helper-check"]
-                        .iter()
-                        .any(|p| path == format!("{API}/{p}"))
+                    && [
+                        "save",
+                        "delete",
+                        "assign",
+                        "verify",
+                        "helper-check",
+                        "helper-install",
+                    ]
+                    .iter()
+                    .any(|p| path == format!("{API}/{p}"))
                 {
                     response((|| {
                         let s = configured()?;
@@ -144,7 +160,9 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                         let mut body: Value =
                             serde_json::from_slice(&bytes).map_err(|_| "Invalid JSON")?;
                         let action = path.rsplit('/').next().unwrap_or("");
-                        let result = if action == "helper-check" {
+                        let result = if action == "helper-install" {
+                            helper::install()
+                        } else if action == "helper-check" {
                             helper_check(body["path"].as_str().unwrap_or(""))
                         } else if action == "verify" {
                             verify(
@@ -153,7 +171,10 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                                 &SystemVault,
                             )
                         } else {
-                            s.mutate(action, &body, &SystemVault)
+                            s.mutate(action, &body, &SystemVault).map(|mut state| {
+                                state["helper"] = helper::status();
+                                state
+                            })
                         };
                         if let Some(Value::String(token)) = body.get_mut("token") {
                             zeroize::Zeroize::zeroize(token)

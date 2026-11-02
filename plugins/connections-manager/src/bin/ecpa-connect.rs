@@ -80,6 +80,25 @@ fn run() -> Result<i32, String> {
                 return Err("Use -- before the executable".into());
             }
             let exe = args.next().ok_or("Missing executable")?;
+            let filename = exe
+                .replace('\\', "/")
+                .rsplit('/')
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let self_path = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.canonicalize().ok());
+            if [
+                "ecpa-connect",
+                "ecpa-connect.exe",
+                "ecpa-connect_windows_amd64.exe",
+            ]
+            .contains(&filename.as_str())
+                || self_path.is_some() && PathBuf::from(&exe).canonicalize().ok() == self_path
+            {
+                return Err("The helper cannot launch itself. Supply a separate tool/MCP server, or use portainer-mcp directly for a Portainer connection.".into());
+            }
             let extension = PathBuf::from(&exe)
                 .extension()
                 .map(|s| s.to_string_lossy().to_lowercase())

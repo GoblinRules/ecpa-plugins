@@ -1,7 +1,7 @@
 """Real-core and helper checks using synthetic, uniquely namespaced Windows credentials."""
 import argparse, concurrent.futures, ctypes, hashlib, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request, urllib.error
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--core',required=True);p.add_argument('--serve',action='store_true');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--core',required=True);p.add_argument('--serve',action='store_true');p.add_argument('--browser',action='store_true');a=p.parse_args()
 ROOT=Path(__file__).resolve().parents[3];KEY='connections-isolated-test-key'
 with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
  home=Path(tmp);data=home/'data';plugins=home/'plugins';plugins.mkdir();project=home/'project';project.mkdir()
@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
   assert r.returncode==0,(r.returncode,r.stderr);assert 'synthetic-' not in r.stdout+r.stderr;return r
  targets=['gh-work','cf-work','cf-personal','browser-test','portainer-test']
  with (home/'core.log').open('wb') as log:
-  process=subprocess.Popen([str(Path(a.core).resolve()),'-config',str(home/'config.yaml'),'--local-model'],cwd=home,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
+  process=subprocess.Popen([str(Path(a.core).resolve()),'-config',str(home/'config.yaml'),'--local-model'],cwd=home,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW,env={**os.environ,'LOCALAPPDATA':str(home/'localappdata')})
   try:
    for _ in range(150):
     try:
@@ -33,6 +33,18 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
     time.sleep(.1)
    else:raise RuntimeError('Core failed to become ready')
    state=api('state');assert not state['connections']
+   managed=state['helper'];assert managed['available'] and managed['ready'], managed
+   managed_path=Path(managed['path']);assert managed_path.is_relative_to(home)
+   assert hashlib.sha256(managed_path.read_bytes()).hexdigest()==managed['sha256']
+   assert managed_path.read_bytes()==Path(helper).read_bytes()
+   assert request('/v0/management/connections-manager/helper-install',{},auth=False)[0]==401
+   managed_path.write_bytes(b'broken synthetic helper')
+   assert not api('state')['helper']['ready']
+   repaired=api('helper-install',{'path':str(home/'not-allowed.exe')});assert repaired['ready']
+   assert not (home/'not-allowed.exe').exists()
+   assert managed_path.read_bytes()==Path(helper).read_bytes()
+   helper=str(managed_path)
+   print('PASS: bundled helper auto-install, checksum validation, authenticated repair and fixed destination',flush=True)
    diagnostics=api('helper-check',{'path':helper});assert diagnostics['name']=='ecpa-connect' and diagnostics['version']==diagnostics['pluginVersion']
    assert request('/v0/management/connections-manager/helper-check',{'path':helper},auth=False)[0]==401
    assert request('/v0/management/connections-manager/helper-check',{'path':'relative.exe'})[0]==400
@@ -58,11 +70,17 @@ with tempfile.TemporaryDirectory(prefix='ecpa-connections-test-') as tmp:
     child=subprocess.run([helper,'--data-dir',spelling,'run','--connection','gh-work','--',sys.executable,'-c',"import os;assert os.environ['GH_TOKEN']=='synthetic-gh-work'"],capture_output=True,text=True,timeout=20)
     assert child.returncode==0,child.stderr
     assert 'synthetic-' not in listing.stdout+listing.stderr+child.stdout+child.stderr
+   for executable in [helper, helper.replace('\\','/'), 'ecpa-connect.exe', 'ECPA-CONNECT_WINDOWS_AMD64.EXE']:
+    rejected=subprocess.run([helper,'--data-dir',str(data),'run','--connection','gh-work','--',executable],capture_output=True,text=True,timeout=10)
+    assert rejected.returncode==1 and 'cannot launch itself' in rejected.stderr
+   print('PASS: helper rejects recursive self-launches',flush=True)
    print('PASS: native helper reads the same Windows vault credentials with backslash, forward-slash and mixed data directory arguments',flush=True)
    print('PASS: native plugin authentication, public-resource boundary, Windows vault, secret-free catalogue, stale-write rejection, project assignment, concurrent account isolation, stdio and exit-code forwarding',flush=True)
    from portainer import check
    check(api,helper,data)
    state=api('state')
+   if a.browser:
+    subprocess.run(['node',str(ROOT/'plugins/connections-manager/tests/browser.cjs')],cwd=ROOT,env={**os.environ,'CONNECTIONS_BASE':base},check=True,timeout=180)
    if a.serve:
     print('CONNECTIONS_BASE='+base,flush=True);print('CONNECTIONS_PROJECT='+str(project),flush=True);process.wait()
    else:

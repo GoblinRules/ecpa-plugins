@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Bundle the matching helper in the DLL and install it at one stable per-user location, without a separate download.
+- Verify staged bytes with SHA-256 and replace atomically. Locked helpers are preserved with an authenticated Install / repair retry.
+- Default to the managed helper across browsers; retain an advanced custom-path option with version verification.
+- Distinguish saved credentials, account verification and helper readiness. Display account names and immutable IDs when generating configurations.
+- Give each account/project its own MCP entry name; reject helper self-launches, missing credentials and shell shims.
+- Preserve existing credentials, account metadata and custom helper files. Existing agent configurations need a one-time path/entry update to adopt managed mode.
+
 ## 0.5.2
 
 - Fix missing credentials when the same Windows data directory uses forward slashes instead of backslashes.

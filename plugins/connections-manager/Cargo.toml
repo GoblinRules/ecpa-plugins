@@ -1,6 +1,6 @@
 [package]
 name = "connections-manager"
-version = "0.5.2"
+version = "0.6.0"
 repository = "https://github.com/GoblinRules/ecpa-connections-manager"
 edition = "2021"
 license = "MIT"
@@ -12,6 +12,10 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "ecpa-connect"
 path = "src/bin/ecpa-connect.rs"
+
+[features]
+# Release packaging builds the helper first, then embeds it in the DLL only.
+bundled-helper = []
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

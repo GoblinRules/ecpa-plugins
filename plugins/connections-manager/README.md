@@ -1,16 +1,28 @@
 # Connections Manager
 
-Named Cloudflare and GitHub connections for Claude Code, Codex, Wrangler, GitHub CLI and compatible stdio MCP servers. Windows x64, version 0.5.2.
+Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.6.0.
 
 ## Install
 
 Add the [ECPA Plugins registry](https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/registry.json), install **Connections Manager**, and open its page. Unlock with the proxy management key. The key is session-only; account tokens are stored in **Windows Credential Manager**, never in the catalogue or agent instructions.
 
-Download `ecpa-connect_windows_amd64.exe` and `checksums.txt` from the [release repository](https://github.com/GoblinRules/ecpa-connections-manager/releases/latest). Verify the helper's SHA-256 with `Get-FileHash`, save it in a stable location such as `C:\Tools`, and optionally rename it `ecpa-connect.exe`. The plugin installer installs the DLL; the helper is a separate executable and is not automatically installed or added to PATH.
+The release DLL includes its matching `ecpa-connect.exe`. When the plugin loads, it installs or updates one shared copy at:
+
+```text
+%LOCALAPPDATA%\ECPA\helpers\connections-manager\ecpa-connect.exe
+```
+
+Open **Settings → Shared helper** to see its version, location and readiness. **Verify helper** runs a noninteractive executable/version check. No separate installer or download is needed. Installation uses a temporary file, SHA-256 comparison and atomic replacement; if an agent is using the old executable, it is preserved. Stop the affected agent/MCP process, then click **Install / repair**. The account catalogue and vault are not changed by helper installation.
+
+**Upgrading from 0.5.x:** existing agent configurations continue using their old helper path. Regenerate and merge each MCP entry once to adopt the managed location, then restart that MCP server. New entries use distinct names such as `ecpa-portainer-remote`; remove the superseded `named-connection` entry yourself to avoid running both. Future plugin updates use the same managed path. Existing running processes must restart to use a new helper version.
+
+Advanced users can opt into a custom executable under **Settings → Advanced**. Its location is browser-local, must be verified before generation, and must be updated manually. The standalone helper and `checksums.txt` remain available in the [release repository](https://github.com/GoblinRules/ecpa-connections-manager/releases/latest). Older saved custom locations are retained, but managed mode is the new default.
 
 The core, helper and agents must run as the **same Windows user**. A core running as a Windows service account has a different credential vault. This release manages local connections; it does not synchronize credentials to other computers.
 
 ## Add accounts
+
+The setup wizard walks through service, authentication method, details and review. After saving, use **Verify account** to check service access, then **Connect a tool or agent**. The status distinguishes a saved credential from a successful account check; results are session-only and clear when you refresh or edit the account. A passed account check does not mean an agent is configured.
 
 Create one connection per account: e.g. `cf-personal`, `cf-work`, `cf-client-a`, `gh-personal`, `gh-work`. IDs are stable lowercase letters, digits and hyphens. Display names can be edited freely. A connection's service cannot be changed. A blank token when editing keeps the saved token; entering a token replaces it.
 
@@ -28,11 +40,11 @@ Assignments are local metadata, not automatic modifications to agent configs. A 
 ## CLI usage
 
 ```powershell
-& 'C:\Tools\ecpa-connect.exe' list
-& 'C:\Tools\ecpa-connect.exe' check cf-work
-& 'C:\Tools\ecpa-connect.exe' run --connection gh-work -- gh.exe repo list
-& 'C:\Tools\ecpa-connect.exe' run --project 'C:\Projects\client-site' -- gh.exe auth status
-& 'C:\Tools\ecpa-connect.exe' run --connection cf-work -- node.exe 'C:\Projects\client-site\node_modules\wrangler\bin\wrangler.js' whoami
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" list
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" check cf-work
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" run --connection gh-work -- gh.exe repo list
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" run --project 'C:\Projects\client-site' -- gh.exe auth status
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" run --connection cf-work -- node.exe 'C:\Projects\client-site\node_modules\wrangler\bin\wrangler.js' whoami
 ```
 
 On Windows, use `node.exe` plus Wrangler's JavaScript entry point instead of the `wrangler.cmd` shim. The helper rejects `.cmd`, `.bat` and `.ps1` entry points. It passes arguments directly to the selected executable, with no constructed shell command. For agents distributed as npm shims, use the corresponding Node entry point too.
@@ -45,7 +57,9 @@ GitHub CLI authentication is not a Git SSH identity manager. Git's SSH keys/HTTP
 
 ## Claude / Codex / MCP Manager
 
-The **Use with agents & tools** page generates PowerShell commands and Claude JSON or Codex TOML snippets. Select the MCP server executable and its arguments, then merge the generated server entry into the agent config. You can also paste the individual Claude server definition into MCP Manager's advanced editor and use its preview/apply flow. Tokens stay out of those files.
+The **Use with agents & tools** page generates PowerShell commands and Claude JSON or Codex TOML snippets. Select the separately installed MCP server executable and its arguments, then merge the generated server entry into the agent config. You can also paste the individual Claude server definition into MCP Manager's advanced editor and use its preview/apply flow. Tokens stay out of those files.
+
+The generator displays the selected account names/IDs and uses a distinct MCP entry name per account or project. It rejects missing credentials, helper self-launches and shell shims. Only Portainer has a built-in MCP server here. Cloudflare and GitHub require a compatible external stdio MCP server for this workflow; the helper itself, GitHub CLI and Wrangler are not those servers. Remote OAuth MCP endpoints belong in the agent’s own MCP setup.
 
 The helper passes through stdin/stdout and the child exit code; its account selection message goes to stderr, preserving stdio MCP framing. Only token-based servers accepting the listed environment variables are supported. Remote OAuth-only servers need their own login flow.
 
@@ -70,15 +84,15 @@ The real-core test creates uniquely scoped synthetic credentials, verifies proce
 
 References: [Wrangler environment variables](https://developers.cloudflare.com/workers/wrangler/system-environment-variables/), [GitHub CLI environment](https://cli.github.com/manual/gh_help_environment).
 
-## GitHub browser sign-in (0.2.0)
+## GitHub browser sign-in (introduced in 0.2.0)
 
 Use **Add an account → Sign in with GitHub CLI** to generate a PowerShell command, or run:
 
 ```powershell
-& 'C:\Tools\ecpa-connect.exe' login-github gh-work 'GitHub Work'
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" login-github gh-work 'GitHub Work'
 ```
 
-Install GitHub CLI first and update the helper as well as the plugin. Finish the browser/device-code flow, then type the verified username in the terminal. Click Refresh in the plugin. Each new ID is independent; existing IDs cannot be overwritten by this command. The resulting OAuth token uses the same Windows vault and per-process selection as API tokens. Reauthenticate with a new connection if GitHub revokes the token; this is not a generic OAuth refresh broker.
+Install GitHub CLI first; packaged plugins manage the helper version automatically. Finish the browser/device-code flow, then type the verified username in the terminal. Click Refresh in the plugin. Each new ID is independent; existing IDs cannot be overwritten by this command. The resulting OAuth token uses the same Windows vault and per-process selection as API tokens. Reauthenticate with a new connection if GitHub revokes the token; this is not a generic OAuth refresh broker.
 
 The helper uses an ephemeral `GH_CONFIG_DIR` and `--insecure-storage` because gh's system credential entries are not isolated by its config directory. It imports the token into Windows Credential Manager and deletes the temporary profile on normal success, error or cancellation. Forced process termination or machine failure can leave an `ecpa-github-login-*` folder in the current user's temporary directory containing the token; remove that leftover folder. No global gh login is changed. No sign-in is performed from the web server process.
 
@@ -90,10 +104,10 @@ Validation: Rust tests, native-core integration and responsive Edge tests pass. 
 
 ## Use an existing local GitHub login (0.3.0)
 
-In **Add an account → Use an existing GitHub login or sign in**, keep **Use an existing local GitHub login** selected. Set the helper path, a new connection ID and a display name, then generate and run the command in PowerShell:
+In **Add an account → Use an existing GitHub login or sign in**, keep **Use an existing local GitHub login** selected. Set a new connection ID and display name using the shared helper, then generate and run the command in PowerShell:
 
 ```powershell
-& 'C:\Tools\ecpa-connect.exe' import-github gh-work 'GitHub Work'
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" import-github gh-work 'GitHub Work'
 ```
 
 The terminal lists saved github.com accounts from GitHub CLI. Choose a number, then confirm the verified username. Refresh the plugin afterwards. No browser sign-in is needed. Requires a recent GitHub CLI with `auth status --json` and `auth token --user` support. Discovery respects your shell's `GH_CONFIG_DIR` and Windows user; inherited token environment variables are ignored so they cannot override the chosen saved account. The import never runs `gh auth switch` or modifies the source profile.
@@ -104,16 +118,16 @@ This feature imports GitHub service credentials only. Codex/Claude agent authent
 
 ## Portainer read-only MCP (0.4.0)
 
-Update both the plugin and the separate `ecpa-connect_windows_amd64.exe` helper. Add an account with service **Portainer**, a name, a connection ID, and its server origin (for example `http://portainer-host.example.ts.net:9000`). Paste an access token from Portainer **My account → Access tokens** into the plugin's local token field and save. Tokens stay in Windows Credential Manager. **Verify account** checks the authenticated environments endpoint and reports the number accessible to the token; it does not claim to identify its owner.
+Update the plugin; its bundled helper is installed automatically. Custom helper locations still need manual updates. Add an account with service **Portainer**, a name, a connection ID, and its server origin (for example `http://portainer-host.example.ts.net:9000`). Paste an access token from Portainer **My account → Access tokens** into the plugin's local token field and save. Tokens stay in Windows Credential Manager. **Verify account** checks the authenticated environments endpoint and reports the number accessible to the token; it does not claim to identify its owner.
 
 The URL accepts HTTP or HTTPS origins with optional ports. Paths, queries, fragments and embedded credentials are rejected. HTTPS validates certificates. HTTP can be used with a trusted private network such as Tailscale; the machine running the helper must be connected to that network. Changing the destination URL requires entering the token again. Redirects are never followed with the credential.
 
-Choose **Connect a tool or agent → Portainer: built-in read-only MCP**, select the account, enter the full helper path, and generate Claude or Codex configuration. Merge the individual definition into the agent's MCP settings (or use MCP Manager's advanced editor) and restart the agent/server. No additional MCP package or Portainer-side installation is needed. Do not overwrite other MCP entries. Each account should use a distinct server name if you add more than one.
+Choose **Connect a tool or agent → Portainer: built-in read-only MCP**, select the account, use the shared helper, and generate Claude or Codex configuration. Merge the individual definition into the agent's MCP settings (or use MCP Manager's advanced editor) and restart the agent/server. No additional MCP package or Portainer-side installation is needed. Do not overwrite other MCP entries. Each account should use a distinct server name if you add more than one.
 
 The helper command is:
 
 ```powershell
-& 'C:\Tools\ecpa-connect.exe' portainer-mcp portainer-remote
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" portainer-mcp portainer-remote
 ```
 
 It serves newline-delimited JSON-RPC over stdin/stdout and is meant to be launched by an MCP client. Use `--data-dir PATH` before the command if the plugin uses a custom catalogue location. It reads the selected credential from the vault for each tool call, without passing it through command arguments or config. The same user and catalogue can serve Codex and Claude. Project assignment and generic `run` credential export are not supported for Portainer; use the built-in MCP preset directly.
@@ -132,9 +146,7 @@ Validated with synthetic Portainer responses, the actual core, native helper, Wi
 
 New connections use four steps: **Service → Connection method → Account details → Review and connect**. GitHub offers existing CLI login, browser sign-in and tokens; Cloudflare and Portainer offer their supported token method. Back preserves your draft. Token fields and service-specific fields only appear when relevant. Existing accounts open directly for editing. Save first, then verify access and connect a tool.
 
-Under **Settings**, set the shared `ecpa-connect.exe` (or its downloaded `ecpa-connect_windows_amd64.exe` filename) location once. One executable serves all connections and both agents on the device. **Verify helper** runs its noninteractive diagnostics, checks the identity and reports the helper/plugin versions, with a three-second deadline. It does not test service credentials or establish account connectivity; use **Verify account** for that. Use only a helper executable you trust. Older helpers need updating to support diagnostics.
-
-The helper location is remembered in browser local storage, shared by this editor's workflows. It is not written into the credential catalogue and is not synced across browsers/devices. Secrets remain in the Windows vault. On another browser, set the path again. The path refers to the plugin host's filesystem; run the helper under the same Windows user as the vault.
+Version 0.6.0 supersedes the manual helper setup from 0.5.x: Settings defaults to the bundled, managed helper. One executable serves all connections and agents. Advanced custom locations remain browser-local. **Verify helper** checks the executable/version with a three-second deadline; **Verify account** checks service access. Neither automatically registers an MCP server in an agent.
 
 The tool generator filters choices by selected account or project. Portainer exposes only the built-in MCP and Codex/Claude formats. GitHub and Cloudflare expose matching CLI presets and advanced local MCP/custom executable options. CLI commands offer PowerShell output only. Changing accounts clears stale generated commands.
 
@@ -144,4 +156,10 @@ Service logos are bundled from [Simple Icons](https://github.com/simple-icons/si
 
 The helper and plugin now use the same credential namespace for Windows paths spelled with `\` or `/`. Previously, a forward-slash `--data-dir` could load the catalogue but report its saved token missing. New writes use the backslash namespace; reads also check the old forward-slash namespace and the exact supplied spelling. Existing backslash/forward-slash credentials need no manual migration. Existing legacy entries are updated together on token replacement and removed together on deletion. Conflicting tokens under those spellings are rejected until you explicitly re-save the intended token.
 
-Update **both the plugin and helper**. All credential readers (status, verification, process launcher and Portainer MCP) share this lookup. No tokens are printed or copied into the catalogue. This fix normalizes separator style only: keep directory casing, trailing separators and junction/alias spelling consistent with the original configuration. A legacy mixed-separator entry is found when its exact original spelling is supplied; resaving through that spelling also creates the normalized entry. Moving the catalogue still does not transfer credentials.
+Update the plugin (and any manually maintained custom helper). All credential readers (status, verification, process launcher and Portainer MCP) share this lookup. No tokens are printed or copied into the catalogue. This fix normalizes separator style only: keep directory casing, trailing separators and junction/alias spelling consistent with the original configuration. A legacy mixed-separator entry is found when its exact original spelling is supplied; resaving through that spelling also creates the normalized entry. Moving the catalogue still does not transfer credentials.
+
+## Building the bundled helper
+
+Use `python scripts/package.py --plugin connections-manager` for installation artifacts and real-core tests. Packaging builds the helper without an embedded payload, verifies its reported version, then builds the DLL with the `bundled-helper` feature and that exact executable embedded. The plugin ZIP still contains exactly one DLL, compatible with existing ECPA plugin installers. No third-party worker, extension, cookie collector or runtime downloader is included.
+
+A plain `cargo build` is a development build without a bundled helper; the editor labels it and offers the custom-helper workflow. Do not distribute a plain-build DLL as the managed release. The managed helper is intentionally retained on uninstall so existing agent configurations do not become broken; remove it manually after disconnecting those agents if no longer needed.

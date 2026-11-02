@@ -38,3 +38,7 @@ Stage migration on a branch. Publish and verify all dedicated repositories befor
 ### Migration regression check
 
 `tests/store_migration.py --core <isolated-core-executable> --registry <published-registry-url>` copies archived 0.6.1 ZIPs from dist into a temporary core, checks all seven store upgrade offers, installs the new releases, verifies configuration preservation, restarts, and checks loaded metadata. It requires the historical ZIPs in dist and network access; it is a manual migration check, not part of offline CI. It never uses the installed production core or personal agent files.
+
+## Connections Manager helper
+
+Always package Connections Manager through `scripts/package.py`. It builds and version-checks the standalone helper, then embeds those exact bytes in the DLL using the `bundled-helper` feature. The install ZIP remains DLL-only. A plain Cargo build does not embed the executable. Run its real-core integration after packaging; tests isolate `LOCALAPPDATA` so helper installation never touches the operator’s managed helper. The standalone EXE remains a checksummed release asset for advanced custom installations.
