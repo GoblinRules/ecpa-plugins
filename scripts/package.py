@@ -7,8 +7,23 @@ import platform
 import shutil
 import subprocess
 import zipfile
+from pathlib import Path
+from package_gateway import package as bundle_gateway
 from validate import ROOT, select_plugins
 from go_build import build_go
+
+def rust_environment(extra=None):
+    """Avoid embedding developer home/checkout paths in public Windows binaries."""
+    env = {**os.environ, **(extra or {})}
+    existing = env.get('CARGO_ENCODED_RUSTFLAGS', '')
+    if env.get('RUSTFLAGS') and not existing:
+        raise RuntimeError('Use CARGO_ENCODED_RUSTFLAGS for custom release flags; do not silently discard RUSTFLAGS')
+    flags = [existing] if existing else []
+    for source, target in [(Path.home(), '/build-user'), (ROOT, '/workspace/ecpa-plugins')]:
+        for spelling in sorted({str(source), source.as_posix()}):
+            flags.append(f'--remap-path-prefix={spelling}={target}')
+    env['CARGO_ENCODED_RUSTFLAGS'] = '\x1f'.join(flags)
+    return env
 
 def package(plugin=None):
     entries = select_plugins(plugin)
@@ -16,7 +31,7 @@ def package(plugin=None):
     if rust_entries:
         command = ['cargo', 'build', '--release', '--locked']
         command += ['-p', plugin] if plugin else ['--workspace']
-        subprocess.run(command, cwd=ROOT, check=True)
+        subprocess.run(command, cwd=ROOT, check=True, env=rust_environment())
     go_binaries = {entry['id']: build_go(entry) for entry in entries if entry.get('language') == 'go'}
     # Build the CLI without its own payload first, then embed that exact executable
     # in the library. The ZIP stays DLL-only for existing ECPA installers.
@@ -28,7 +43,7 @@ def package(plugin=None):
         assert diagnostic == {'name': 'ecpa-connect', 'version': entry['version']}, 'Helper version mismatch'
         subprocess.run(['cargo', 'build', '--release', '--locked', '-p', 'connections-manager',
             '--lib', '--features', 'bundled-helper'], cwd=ROOT, check=True,
-            env={**os.environ, 'ECPA_HELPER_BINARY': str(helper.resolve())})
+            env=rust_environment({'ECPA_HELPER_BINARY': str(helper.resolve())}))
     os_name = {'Windows': 'windows', 'Linux': 'linux', 'Darwin': 'darwin'}[platform.system()]
     arch = {'AMD64': 'amd64', 'x86_64': 'amd64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine()]
     extension = {'windows': 'dll', 'linux': 'so', 'darwin': 'dylib'}[os_name]
@@ -57,6 +72,9 @@ def package(plugin=None):
             shutil.copy2(ROOT / 'target/release/ecpa-connect.exe', helper)
             checksum_lines.append(f'{hashlib.sha256(helper.read_bytes()).hexdigest()}  {helper.name}\n')
             extra_assets.append(helper)
+            gateway = bundle_gateway(helper=helper, output=dist, write_checksums=False)
+            checksum_lines.append(f'{hashlib.sha256(gateway.read_bytes()).hexdigest()}  {gateway.name}\n')
+            extra_assets.append(gateway)
         checksums.write_text(''.join(checksum_lines), encoding='utf-8')
         manifest = dist / 'release.json'
         manifest.write_text(json.dumps({'plugin': plugin_id, 'version': version,

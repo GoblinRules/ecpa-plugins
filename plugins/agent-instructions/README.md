@@ -137,3 +137,10 @@ Agent navigation is grouped into six sections with embedded product icons. Codex
 ## Releases
 
 Binaries and per-plugin releases: [ecpa-agent-instructions](https://github.com/GoblinRules/ecpa-agent-instructions). Source and shared code remain in this workspace. See [independent releases](../../docs/releases.md).
+
+
+## Build-path privacy update (0.6.4)
+
+Public release binaries now remap developer home/checkout paths to neutral build paths.
+This packaging-only update does not change your configuration or plugin behavior.
+Historical downloads may retain old compiler paths; see the source repository security audit.

@@ -1,0 +1,12 @@
+{
+  "id": "portainer-homelab-read",
+  "name": "Portainer homelab read",
+  "service": "portainer",
+  "kind": "portainer",
+  "url": "https://YOUR-PORTAINER-HOST",
+  "enabled": false,
+  "credential_refs": [{"kind":"env","name":"PORTAINER_API_KEY","reference":{"provider":"bitwarden","region":"eu","secret_id":"00000000-0000-0000-0000-000000000000"}}],
+  "allowed_tools": [],
+  "access_group": "homelab",
+  "project_ids": ["homelab"]
+}

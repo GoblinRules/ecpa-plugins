@@ -15,7 +15,8 @@ assert not any(output.iterdir()), 'Output must be empty; existing repository fil
 repo = entry['repository']
 is_go = entry.get('language') == 'go'
 manifest = 'plugin.toml' if is_go else 'Cargo.toml'
-version_notes = '' if is_go else 'Versions through 0.6.1 were published in the old collection repository. 0.6.2 starts independent releases without downgrading installed plugins; future releases do not have to match other plugins.'
+collection_ids = {'agent-instructions','agent-profiles','agent-diagnostics','agent-skills','prompt-library','config-snapshots','mcp-manager'}
+version_notes = 'Versions through 0.6.1 were published in the old collection repository. 0.6.2 starts independent releases without downgrading installed plugins; future releases do not have to match other plugins.' if args.plugin in collection_ids else 'This plugin has its own version history; its version does not need to match other plugins.'
 source = f"https://github.com/GoblinRules/ecpa-plugins/tree/master/plugins/{args.plugin}"
 readme = f'''# {entry['name']}
 
@@ -41,6 +42,8 @@ Refresh the Plugin store and install **{entry['name']}**. Existing users keep th
 - [Shared agent tools documentation](https://github.com/GoblinRules/ecpa-plugins/blob/master/docs/agent-tools.md)
 - [Source workspace and contributing](https://github.com/GoblinRules/ecpa-plugins)
 - [Release process](https://github.com/GoblinRules/ecpa-plugins/blob/master/docs/releases.md)
+- [Public-source and release privacy audit](https://github.com/GoblinRules/ecpa-plugins/blob/master/docs/publication-security-audit.md)
+- [Central MCP runtime and Windows host setup](https://github.com/GoblinRules/ecpa-plugins/tree/master/runtime/mcp-gateway)
 
 ## Repository layout
 

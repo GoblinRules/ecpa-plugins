@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.6.0.
+Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.7.0.
 
 ## Install
 
@@ -14,7 +14,7 @@ The release DLL includes its matching `ecpa-connect.exe`. When the plugin loads,
 
 Open **Settings → Shared helper** to see its version, location and readiness. **Verify helper** runs a noninteractive executable/version check. No separate installer or download is needed. Installation uses a temporary file, SHA-256 comparison and atomic replacement; if an agent is using the old executable, it is preserved. Stop the affected agent/MCP process, then click **Install / repair**. The account catalogue and vault are not changed by helper installation.
 
-**Upgrading from 0.5.x:** existing agent configurations continue using their old helper path. Regenerate and merge each MCP entry once to adopt the managed location, then restart that MCP server. New entries use distinct names such as `ecpa-portainer-remote`; remove the superseded `named-connection` entry yourself to avoid running both. Future plugin updates use the same managed path. Existing running processes must restart to use a new helper version.
+**Upgrading from 0.5.x:** existing agent configurations continue using their old helper path. Regenerate and merge each MCP entry once to adopt the managed location, then restart that MCP server. New entries use distinct names such as `ecpa-portainer-demo`; remove the superseded `named-connection` entry yourself to avoid running both. Future plugin updates use the same managed path. Existing running processes must restart to use a new helper version.
 
 Advanced users can opt into a custom executable under **Settings → Advanced**. Its location is browser-local, must be verified before generation, and must be updated manually. The standalone helper and `checksums.txt` remain available in the [release repository](https://github.com/GoblinRules/ecpa-connections-manager/releases/latest). Older saved custom locations are retained, but managed mode is the new default.
 
@@ -127,7 +127,7 @@ Choose **Connect a tool or agent → Portainer: built-in read-only MCP**, select
 The helper command is:
 
 ```powershell
-& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" portainer-mcp portainer-remote
+& "$env:LOCALAPPDATA\ECPA\helpers\connections-manager\ecpa-connect.exe" portainer-mcp portainer-demo
 ```
 
 It serves newline-delimited JSON-RPC over stdin/stdout and is meant to be launched by an MCP client. Use `--data-dir PATH` before the command if the plugin uses a custom catalogue location. It reads the selected credential from the vault for each tool call, without passing it through command arguments or config. The same user and catalogue can serve Codex and Claude. Project assignment and generic `run` credential export are not supported for Portainer; use the built-in MCP preset directly.
@@ -163,3 +163,24 @@ Update the plugin (and any manually maintained custom helper). All credential re
 Use `python scripts/package.py --plugin connections-manager` for installation artifacts and real-core tests. Packaging builds the helper without an embedded payload, verifies its reported version, then builds the DLL with the `bundled-helper` feature and that exact executable embedded. The plugin ZIP still contains exactly one DLL, compatible with existing ECPA plugin installers. No third-party worker, extension, cookie collector or runtime downloader is included.
 
 A plain `cargo build` is a development build without a bundled helper; the editor labels it and offers the custom-helper workflow. Do not distribute a plain-build DLL as the managed release. The managed helper is intentionally retained on uninstall so existing agent configurations do not become broken; remove it manually after disconnecting those agents if no longer needed.
+
+
+## Managed MCP gateway (0.7.0)
+
+The existing Accounts & CLI page now links to **MCP services & gateway**. A separate
+Python SDK worker supplies authenticated Streamable HTTP, named account profiles,
+Bitwarden Secrets Manager references, explicit client/project/tool grants, activity,
+OAuth drafts, client setup previews/backups and rollback. The native Portainer
+implementation is reused through an isolated environment mode.
+
+Install/configure the separate worker before opening this page; it is not bundled
+as an invisible downloader in the DLL. See [runtime architecture and setup](../../runtime/mcp-gateway/README.md)
+and [Windows host readiness](../../runtime/mcp-gateway/HOST-READINESS.md). The plugin
+reads gateway-runtime.json in its configured data directory and forwards only to
+a loopback worker using the same Windows identity's vault. Existing connection
+records/credentials are retained.
+
+A real Bitwarden-backed Portainer read through the authenticated gateway has now
+passed on the development PC. The final Windows central host, Tailscale TLS endpoint,
+reboot persistence, provider-key adapter and service-specific OAuth/Runway setup
+remain separate deployment/integration work. The gateway worker is a separate release asset; follow its host setup guide.

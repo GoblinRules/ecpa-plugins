@@ -1,0 +1,10 @@
+title = "ECPA public-source secret scan"
+[extend]
+useDefault = true
+
+[[allowlists]]
+condition = "AND"
+description = "Fixed, deliberately synthetic OAuth state in the Z.ai contract test; not a service credential"
+paths = ['''(^|/)plugins/zai-provider/auth_test\.go$''']
+regexTarget = "secret"
+regexes = ['''^0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef$''']

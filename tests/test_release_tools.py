@@ -22,7 +22,9 @@ class ReleaseToolsTest(unittest.TestCase):
             (binaries / 'connections_manager.dll').write_bytes(b'fixture DLL')
             (binaries / 'ecpa-connect.exe').write_bytes(b'fixture helper')
             entry = {'id': 'connections-manager', 'version': '0.1.0', 'repository': 'https://github.com/GoblinRules/ecpa-connections-manager'}
-            with patch.object(package, 'ROOT', root), patch.object(package, 'select_plugins', return_value=[entry]), patch.object(package.platform, 'system', return_value='Windows'), patch.object(package.platform, 'machine', return_value='AMD64'), patch.object(package.subprocess, 'run') as run, patch.object(package.subprocess, 'check_output', side_effect=[json.dumps({'name':'ecpa-connect','version':'0.1.0'}), 'a' * 40]):
+            gateway = root / 'gateway.zip'
+            gateway.write_bytes(b'fixture gateway bundle')
+            with patch.object(package, 'bundle_gateway', return_value=gateway), patch.object(package, 'ROOT', root), patch.object(package, 'select_plugins', return_value=[entry]), patch.object(package.platform, 'system', return_value='Windows'), patch.object(package.platform, 'machine', return_value='AMD64'), patch.object(package.subprocess, 'run') as run, patch.object(package.subprocess, 'check_output', side_effect=[json.dumps({'name':'ecpa-connect','version':'0.1.0'}), 'a' * 40]):
                 _, assets = package.package('connections-manager')[0]
                 self.assertEqual(run.call_count, 2)
                 self.assertEqual(run.call_args.args[0][-3:], ['--lib', '--features', 'bundled-helper'])
@@ -31,6 +33,8 @@ class ReleaseToolsTest(unittest.TestCase):
                 self.assertEqual(archive.namelist(), ['connections-manager.dll'])
             self.assertEqual(assets[3].name, 'ecpa-connect_windows_amd64.exe')
             self.assertIn(hashlib.sha256(b'fixture helper').hexdigest(), assets[1].read_text())
+            self.assertEqual(assets[4], gateway)
+            self.assertIn(hashlib.sha256(gateway.read_bytes()).hexdigest(), assets[1].read_text())
 
     def test_versions_can_diverge_without_changing_other_plugins(self):
         with tempfile.TemporaryDirectory() as temp:

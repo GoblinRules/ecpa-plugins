@@ -23,6 +23,13 @@ fn run() -> Result<i32, String> {
         );
         return Ok(0);
     }
+    if action == "portainer-mcp-env" {
+        if args.next().is_some() {
+            return Err("Unexpected arguments".into());
+        }
+        connections_manager::portainer::serve_environment()?;
+        return Ok(0);
+    }
     let store = Store::new(match dir {
         Some(d) => d,
         None => store::default_dir()?,

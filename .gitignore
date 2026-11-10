@@ -2,4 +2,20 @@
 /dist/
 /test-artifacts/
 __pycache__/
+.venv/
+.pytest_cache/
+*.egg-info/
+/runtime/mcp-gateway/build/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+gateway-runtime.json
+mcp-services.json
+machines.json
+machines.before.json
+connections.json
 

@@ -35,3 +35,10 @@ The isolated core test covers this plugin's real DLL and authenticated routes. A
 ## Releases
 
 Binaries and per-plugin releases: [ecpa-agent-diagnostics](https://github.com/GoblinRules/ecpa-agent-diagnostics). Source and shared code remain in this workspace. See [independent releases](../../docs/releases.md).
+
+
+## Build-path privacy update (0.6.4)
+
+Public release binaries now remap developer home/checkout paths to neutral build paths.
+This packaging-only update does not change your configuration or plugin behavior.
+Historical downloads may retain old compiler paths; see the source repository security audit.

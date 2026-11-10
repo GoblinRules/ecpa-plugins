@@ -1,0 +1,20 @@
+{
+  "id": "cloudflare-work-read",
+  "name": "Cloudflare work read",
+  "service": "cloudflare",
+  "account_id": "00000000000000000000000000000000",
+  "kind": "stdio",
+  "transport": {"command":"C:\\Program Files\\nodejs\\node.exe","args":["C:\\ECPA\\connectors\\REVIEWED-CLOUDFLARE-MCP\\index.js"],"package":"REPLACE-WITH-INSTALLED-PACKAGE","version":"REPLACE-WITH-REVIEWED-VERSION"},
+  "enabled": false,
+  "credential_refs": [{"kind":"env","name":"CLOUDFLARE_API_TOKEN","reference":{"provider":"bitwarden","region":"eu","secret_id":"00000000-0000-0000-0000-000000000000"}}],
+  "allowed_tools": [],
+  "access_group": "work",
+  "project_ids": ["work-project"],
+  "wrangler": {
+    "node_executable": "C:\\Program Files\\nodejs\\node.exe",
+    "entrypoint": "C:\\ECPA\\tools\\wrangler\\bin\\wrangler.js",
+    "workspace_ids": ["work-project"],
+    "config_file": "wrangler.jsonc",
+    "operations": {"verify":["whoami"]}
+  }
+}

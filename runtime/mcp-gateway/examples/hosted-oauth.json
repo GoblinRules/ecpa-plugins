@@ -1,0 +1,11 @@
+{
+  "id": "hosted-account-read",
+  "name": "Hosted account (OAuth)",
+  "kind": "http",
+  "url": "https://REVIEWED-MCP-HOST.example/mcp",
+  "oauth": {"allowed_origins":["https://REVIEWED-AUTHORIZATION-HOST.example"],"callback_port":8770},
+  "credential_refs": [],
+  "enabled": false,
+  "allowed_tools": [],
+  "access_group": "default"
+}

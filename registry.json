@@ -108,7 +108,7 @@
     {
       "id": "connections-manager",
       "name": "Connections Manager",
-      "description": "Named Cloudflare, GitHub and Portainer connections, secure Windows credentials, project assignments and read-only Portainer MCP tools.",
+      "description": "Named service accounts and a shared MCP gateway, Bitwarden credential references, explicit tool/client policies and reversible agent setup.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-connections-manager",
       "homepage": "https://github.com/GoblinRules/ecpa-connections-manager",
@@ -147,6 +147,22 @@
         "Authentication",
         "Management"
       ]
+    },
+    {
+      "id": "ssh-machines",
+      "name": "SSH & Machines",
+      "description": "Named SSH machine profiles, explicit key selection, pinned host keys and fixed read-only connection diagnostics.",
+      "author": "GoblinRules",
+      "repository": "https://github.com/GoblinRules/ecpa-ssh-machines",
+      "homepage": "https://github.com/GoblinRules/ecpa-ssh-machines",
+      "license": "MIT",
+      "tags": [
+        "Management",
+        "SSH",
+        "Machines",
+        "Tailscale"
+      ],
+      "logo": "https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/ssh-machines.svg"
     }
   ]
 }

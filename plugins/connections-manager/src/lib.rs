@@ -1,3 +1,4 @@
+mod gateway;
 mod helper;
 mod native;
 pub mod portainer;
@@ -121,7 +122,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 json!({})
             }
             "management.register" => {
-                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and project connections"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")},{"Method":"POST","Path":format!("{API}/helper-install")}]})
+                json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and managed MCP services"},gateway::resource()],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")},{"Method":"POST","Path":format!("{API}/helper-install")},{"Method":"POST","Path":format!("{API}/gateway")}]})
             }
             "management.handle" => {
                 let req: Value = serde_json::from_slice(raw).map_err(|_| "Invalid request")?;
@@ -133,6 +134,26 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                         "text/html; charset=utf-8",
                         include_bytes!("../web/editor.html"),
                     )
+                } else if verb == "GET"
+                    && path == "/v0/resource/plugins/connections-manager/gateway"
+                {
+                    http(
+                        200,
+                        "text/html; charset=utf-8",
+                        include_bytes!("../web/gateway.html"),
+                    )
+                } else if verb == "POST" && path == format!("{API}/gateway") {
+                    response((|| {
+                        let bytes = STANDARD
+                            .decode(req["Body"].as_str().unwrap_or(""))
+                            .map_err(|_| "Invalid request body")?;
+                        if bytes.len() > 65536 {
+                            return Err("Request too large".into());
+                        }
+                        let body: Value =
+                            serde_json::from_slice(&bytes).map_err(|_| "Invalid request JSON")?;
+                        gateway::request(&configured()?, &body)
+                    })())
                 } else if verb == "GET" && path == format!("{API}/state") {
                     response(configured().and_then(|s| editor_state(&s)))
                 } else if verb == "POST"

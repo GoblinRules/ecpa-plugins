@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Add a management page and authenticated loopback bridge for the separate MCP SDK gateway.
+- Reuse the read-only Portainer implementation with per-process environment credentials.
+- Add reference-based Bitwarden profiles, exact tool review, client grants, activity and reversible client setup in the companion runtime.
+- Provide native Windows installer, doctor, task-registration script and migration/re-bootstrap runbook.
+- Existing named CLI connections and Windows-vault namespaces remain compatible.
+
+
 ## 0.6.0
 
 - Bundle the matching helper in the DLL and install it at one stable per-user location, without a separate download.

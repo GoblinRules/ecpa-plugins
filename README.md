@@ -28,6 +28,13 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 - **[Config Snapshots](plugins/config-snapshots/README.md)** — Capture and selectively restore supported agent files with change previews.
 - **[Agent Skills](plugins/agent-skills/README.md)** — View, create and edit local SKILL.md files with validation and backups.
 
+## Shared services and machine management
+
+- **[SSH & Machines](plugins/ssh-machines/README.md)** ? Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks and terminal commands.
+- **[Managed MCP gateway](runtime/mcp-gateway/README.md)** ? Connections Manager's separately installed worker for Bitwarden-backed service profiles and authenticated client access.
+- **[Windows host readiness](runtime/mcp-gateway/HOST-READINESS.md)** ? Required versus optional software, runtime identity/bootstrap, startup checks and hardware migration.
+- **[Publication privacy audit](docs/publication-security-audit.md)** ? Checked scope, historical compiler-path findings and release safeguards.
+
 ## Interface and artwork
 
 All plugins include distinct vector artwork. Agent-specific controls reuse the same product icons as Agent Instructions. Editors follow ECPA’s Local Clients layout: charcoal panels, blue accents, persistent left navigation and a spacious editor. Embedded pages retain the sidebar above 650px; phone-sized Instructions views use an agent selector.
@@ -53,6 +60,12 @@ The migration uses 0.6.2 once for all seven to preserve upgrades from 0.6.1. Fut
 
 ## Repository layout
 
+The [managed MCP runtime](runtime/mcp-gateway/README.md) adds the
+Connections Manager gateway, Bitwarden references and shared account profiles.
+It is a separate native-Windows Python worker, delivered as an additional bundle
+in Connections Manager releases; installing the DLL alone does not install Python. See the [host-readiness runbook](runtime/mcp-gateway/HOST-READINESS.md)
+for required programs, bootstrap identity, startup checks and later host migration.
+
 ```text
 registry.json                     Public store catalogue (stable URL)
 Cargo.toml / Cargo.lock            Shared Rust workspace and locked dependencies
@@ -66,6 +79,7 @@ plugins/
     scripts/                      Plugin-specific build entry point
 crates/agent-files/               Shared file protections and instruction paths
 crates/plugin-suite/              Shared native bridge, workflows and UI
+runtime/mcp-gateway/              SDK worker, profile templates, Windows setup and tests
 tests/                            Isolated suite integration/browser checks
 scripts/                          Shared validation and release packaging
 distribution/                     Release-repository templates

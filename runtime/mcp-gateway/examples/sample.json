@@ -1,0 +1,10 @@
+{
+  "id": "sample-read",
+  "name": "Synthetic gateway check",
+  "kind": "sample",
+  "enabled": false,
+  "credential_refs": [],
+  "allowed_tools": [],
+  "access_group": "default",
+  "project_ids": []
+}

@@ -41,4 +41,17 @@ Stage migration on a branch. Publish and verify all dedicated repositories befor
 
 ## Connections Manager helper
 
-Always package Connections Manager through `scripts/package.py`. It builds and version-checks the standalone helper, then embeds those exact bytes in the DLL using the `bundled-helper` feature. The install ZIP remains DLL-only. A plain Cargo build does not embed the executable. Run its real-core integration after packaging; tests isolate `LOCALAPPDATA` so helper installation never touches the operator’s managed helper. The standalone EXE remains a checksummed release asset for advanced custom installations.
+Always package Connections Manager through `scripts/package.py`. It builds and version-checks the standalone helper, then embeds those exact bytes in the DLL using the `bundled-helper` feature. The install ZIP remains DLL-only. A plain Cargo build does not embed the executable. Run its real-core integration after packaging; tests isolate `LOCALAPPDATA` so helper installation never touches the operator?s managed helper. The standalone EXE remains a checksummed release asset for advanced custom installations.
+
+## Publication privacy checks
+
+Before publishing, scan the audited source commit with Gitleaks and the exact-value
+fixture exception in .gitleaks.toml. Keep redacted reports under ignored local audit
+artifacts. scripts/publication_guard.py checks tracked file names/private-key bodies
+and developer-home paths; scripts/publish.py runs it against every upload, including
+the git-archive source ZIP. Rust builds remap checkout/home paths. No user profile
+export, live catalogue, bootstrap credential or local handover belongs in a release.
+
+Connections Manager 0.7.0 also includes the separately installed MCP gateway ZIP
+and its checksum in the release. The ECPA DLL ZIP remains DLL-only. The standalone
+worker does not start merely because a plugin was installed. See its Windows runbook.

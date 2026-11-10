@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agent-diagnostics"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "agent-instructions"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "agent-files",
  "base64",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "agent-profiles"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -53,7 +53,7 @@ dependencies = [
 
 [[package]]
 name = "agent-skills"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -98,7 +98,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "config-snapshots"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "connections-manager"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base64",
  "fs2",
@@ -442,7 +442,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "mcp-manager"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "prompt-library"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "plugin-suite",
  "serde_json",
@@ -708,6 +708,19 @@ name = "smallvec"
 version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+
+[[package]]
+name = "ssh-machines"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "fs2",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sha2",
+ "tempfile",
+]
 
 [[package]]
 name = "stable_deref_trait"

@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 import tempfile
+import sys
 from package import package
 from validate import ROOT, select_plugins
 
@@ -24,6 +25,8 @@ commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=Tr
 source = assets[0].parent / f"{args.plugin}_{entry['version']}_source.zip"
 subprocess.run(['git', 'archive', '--format=zip', f'--output={source}', 'HEAD'], cwd=ROOT, check=True)
 assets.append(source)
+subprocess.run([sys.executable, str(ROOT/'scripts/publication_guard.py'),
+    *[argument for asset in assets for argument in ('--asset', str(asset))]], cwd=ROOT, check=True)
 notes = args.notes_file.read_text(encoding='utf-8') if args.notes_file else entry['description']
 notes += f'\n\nSource: https://github.com/GoblinRules/ecpa-plugins/tree/{commit}/plugins/{args.plugin}\n\nBuilt from `{commit}`. `release.json` records the source revision and binary checksum. The source archive includes the shared workspace needed to reproduce this plugin.\n'
 with tempfile.TemporaryDirectory(prefix='ecpa-release-notes-') as temp:

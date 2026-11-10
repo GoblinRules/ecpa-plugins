@@ -145,6 +145,9 @@ fn call(
     let token = store.credential(id, vault)?;
     drop(lock);
     let data = request(&c.base_url, &token, &path, logs)?;
+    filter_response(name, data, logs)
+}
+fn filter_response(name: &str, data: Value, logs: bool) -> Result<Value, String> {
     if logs {
         return Ok(data);
     }
@@ -173,6 +176,26 @@ pub fn serve(store: &Store, id: &str, vault: &impl Vault) -> Result<(), String> 
     if store.selected(Some(id), None)?[0].service != "portainer" {
         return Err("Select a Portainer connection".into());
     }
+    serve_with(|name, args| call(store, id, vault, name, args))
+}
+/// Gateway-managed mode: only the selected service token enters this process.
+/// The gateway resolves the reference afresh for each operation/child lifetime.
+pub fn serve_environment() -> Result<(), String> {
+    let base = std::env::var("PORTAINER_URL").map_err(|_| "PORTAINER_URL is required")?;
+    validate_url(&base)?;
+    let token = zeroize::Zeroizing::new(
+        std::env::var("PORTAINER_API_KEY").map_err(|_| "PORTAINER_API_KEY is required")?,
+    );
+    if token.is_empty() || token.chars().any(char::is_control) {
+        return Err("Invalid Portainer credential".into());
+    }
+    std::env::remove_var("PORTAINER_API_KEY");
+    serve_with(|name, args| {
+        let (path, logs) = route(name, args)?;
+        filter_response(name, request(&base, &token, &path, logs)?, logs)
+    })
+}
+fn serve_with(call: impl Fn(&str, &Value) -> Result<Value, String>) -> Result<(), String> {
     let mut input = std::io::stdin().lock();
     let mut output = std::io::stdout().lock();
     loop {
@@ -206,13 +229,7 @@ pub fn serve(store: &Store, id: &str, vault: &impl Vault) -> Result<(), String> 
             "tools/list" => Ok(definitions()),
             "tools/call" => {
                 let args = req["params"].get("arguments").cloned().unwrap_or(json!({}));
-                let data = call(
-                    store,
-                    id,
-                    vault,
-                    req["params"]["name"].as_str().unwrap_or(""),
-                    &args,
-                );
+                let data = call(req["params"]["name"].as_str().unwrap_or(""), &args);
                 Ok(match data {
                     Ok(v) => json!({"content":[{"type":"text","text":v.to_string()}]}),
                     Err(e) => json!({"isError":true,"content":[{"type":"text","text":e}]}),
