@@ -24,3 +24,9 @@ Run `python scripts/check_go.py` (format, race detector and vet for both Go plug
 Real-provider login and inference checks require the account owner’s explicit participation and remain unverified until performed. An automated test pass is not proof of provider billing rules or account eligibility.
 
 The Windows race test executable has ASLR disabled because Go’s ThreadSanitizer requires a fixed address layout and Zig 0.14 does not accept the GNU linker flags Go uses for it. `check_go.py` changes only test executable PE flags under `target/go-tests/`. Production DLLs keep ASLR enabled.
+
+For Zig race tests, the check script also builds a synchronization import archive
+from the pinned Zig distribution's Windows API definition under `target/go-tests`.
+This avoids depending on a hosted runner's incidental MinGW library search paths.
+It is test-only and does not modify the toolchain or release DLLs. Git attributes
+keep Go sources in LF format on Windows so clean checkouts pass `gofmt`.

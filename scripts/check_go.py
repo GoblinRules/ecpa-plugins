@@ -2,13 +2,31 @@
 import subprocess
 import sys
 import struct
+import re
+import shutil
 from pathlib import Path
 from go_build import go_environment
 from validate import ROOT
 
 go,env=go_environment()
 # Go's Windows race runtime requires the Windows synchronization import library.
-if sys.platform == 'win32': env['CGO_LDFLAGS'] = '-lapi-ms-win-core-synch-l1-2-0'
+if sys.platform == 'win32':
+    compiler_match = re.match(r'^"([^"]+)"|^(\S+)', env['CC'])
+    compiler = Path(next(value for value in compiler_match.groups() if value))
+    compiler = Path(shutil.which(str(compiler)) or compiler)
+    if compiler.name.lower() in {'zig.exe', 'zig'}:
+        # Hosted runners can discover MinGW's synchronization library while Zig
+        # cannot link it by name. Build a deterministic import archive from the
+        # pinned Zig distribution's Windows API definition instead of relying on
+        # whichever SDK/MinGW installation happens to be on the runner.
+        definition = compiler.parent/'lib/libc/mingw/lib-common/api-ms-win-core-synch-l1-2-0.def'
+        imports = ROOT/'target/go-tests/imports'
+        imports.mkdir(parents=True, exist_ok=True)
+        subprocess.run([str(compiler), 'dlltool', '-m', 'i386:x86-64',
+            '-d', str(definition), '-l', str(imports/'libsynchronization.a')], check=True)
+        env['CGO_LDFLAGS'] = '"-L'+imports.as_posix()+'" -lsynchronization'
+    else:
+        env['CGO_LDFLAGS'] = '-lapi-ms-win-core-synch-l1-2-0'
 for plugin in ['claude-remote-login','zai-provider']:
     source=ROOT/'plugins'/plugin
     gofmt=Path(go).with_name('gofmt.exe')
