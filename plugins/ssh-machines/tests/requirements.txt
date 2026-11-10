@@ -1,2 +1,2 @@
-paramiko==4.0.0
+paramiko==5.0.0
 pywin32==312; sys_platform == "win32"
