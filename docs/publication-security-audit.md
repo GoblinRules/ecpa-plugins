@@ -54,8 +54,12 @@ local SHA-256 hashes, source revision and publication guard. The complete source
 snapshot and printable strings from all nine current plugin binaries also passed
 the secret scan. The two Go plugins remain at 1.1.0; their audited binaries did
 not need this packaging change. All eleven dedicated repositories have updated
-documentation. Historical affected downloads remain available pending the owner's
-retention decision; clean new releases do not retroactively sanitize old files.
+documentation. With the owner's approval, all **48 affected historical binary
+downloads** were removed after verifying the replacements. A subsequent check
+confirmed that exactly those asset IDs were removed and all other historical
+assets, release notes and tags were preserved. Source archives and Git history
+remain available. Previously downloaded copies and third-party caches cannot be
+recalled; the new builds do not retroactively sanitize those copies.
 
 ## Repeating checks
 
