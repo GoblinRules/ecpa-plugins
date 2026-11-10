@@ -47,6 +47,16 @@ download does not revoke any credential; if a real key is ever found, revoke/rot
 it first and then handle history/caches explicitly. No broad history rewrite is
 performed merely to hide compiler paths.
 
+Clean replacements are now published: Connections Manager 0.7.0, MCP Manager
+0.7.1, the six other affected existing Rust plugins at 0.6.4, and SSH & Machines
+0.1.0. All nine releases were downloaded anonymously and verified against the
+local SHA-256 hashes, source revision and publication guard. The complete source
+snapshot and printable strings from all nine current plugin binaries also passed
+the secret scan. The two Go plugins remain at 1.1.0; their audited binaries did
+not need this packaging change. All eleven dedicated repositories have updated
+documentation. Historical affected downloads remain available pending the owner's
+retention decision; clean new releases do not retroactively sanitize old files.
+
 ## Repeating checks
 
 Run `scripts/publication_guard.py` before committing/publishing. It inspects the
