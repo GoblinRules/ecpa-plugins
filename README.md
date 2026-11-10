@@ -30,10 +30,10 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Shared services and machine management
 
-- **[SSH & Machines](plugins/ssh-machines/README.md)** ? Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks and terminal commands.
-- **[Managed MCP gateway](runtime/mcp-gateway/README.md)** ? Connections Manager's separately installed worker for Bitwarden-backed service profiles and authenticated client access.
-- **[Windows host readiness](runtime/mcp-gateway/HOST-READINESS.md)** ? Required versus optional software, runtime identity/bootstrap, startup checks and hardware migration.
-- **[Publication privacy audit](docs/publication-security-audit.md)** ? Checked scope, historical compiler-path findings and release safeguards.
+- **[SSH & Machines](plugins/ssh-machines/README.md)** — Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks and terminal commands.
+- **[Managed MCP gateway](runtime/mcp-gateway/README.md)** — Connections Manager's separately installed worker for Bitwarden-backed service profiles and authenticated client access.
+- **[Windows host readiness](runtime/mcp-gateway/HOST-READINESS.md)** — Required versus optional software, runtime identity/bootstrap, startup checks and hardware migration.
+- **[Publication privacy audit](docs/publication-security-audit.md)** — Checked scope, historical compiler-path findings and release safeguards.
 
 ## Interface and artwork
 
@@ -55,8 +55,9 @@ Source and shared libraries stay here. Each plugin has its own public release re
 - [connections-manager](https://github.com/GoblinRules/ecpa-connections-manager/releases)
 - [claude-remote-login](https://github.com/GoblinRules/ecpa-claude-remote-login/releases)
 - [zai-provider](https://github.com/GoblinRules/ecpa-zai-provider/releases)
+- [ssh-machines](https://github.com/GoblinRules/ecpa-ssh-machines/releases)
 
-The migration uses 0.6.2 once for all seven to preserve upgrades from 0.6.1. Future releases advance independently. Your registry URL and saved configuration stay the same.
+The original seven collection plugins used 0.6.2 once to preserve upgrades from 0.6.1. Releases now advance independently; newer plugins have their own version history. Your registry URL and saved configuration stay the same.
 
 ## Repository layout
 
