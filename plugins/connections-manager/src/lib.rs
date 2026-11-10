@@ -53,7 +53,7 @@ pub fn verify(store: &Store, id: &str, vault: &impl Vault) -> Result<Value, Stri
             c.account_id
         )
     };
-    let response=client.get(&url).set("Authorization",&format!("Bearer {}",&*token)).set("User-Agent","ECPA-Connections-Manager/0.1").set("Accept","application/json").call().map_err(|e|match e{ureq::Error::Status(401,_)=>"Token was rejected".to_string(),ureq::Error::Status(403,_)=>"Account check was denied. Check account ID and token permissions (Cloudflare Account Settings: Read is needed for this check).".into(),_=>"Account check failed; check connectivity and token permissions".into()})?;
+    let response=client.get(&url).set("Authorization",&format!("Bearer {}",*token)).set("User-Agent","ECPA-Connections-Manager/0.1").set("Accept","application/json").call().map_err(|e|match e{ureq::Error::Status(401,_)=>"Token was rejected".to_string(),ureq::Error::Status(403,_)=>"Account check was denied. Check account ID and token permissions (Cloudflare Account Settings: Read is needed for this check).".into(),_=>"Account check failed; check connectivity and token permissions".into()})?;
     let data: Value = response
         .into_json()
         .map_err(|_| "Unexpected service response")?;

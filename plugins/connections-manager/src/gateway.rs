@@ -42,7 +42,7 @@ pub fn request(store: &Store, body: &Value) -> Result<Value, String> {
         "http://127.0.0.1:{}/admin",
         url.port_or_known_default().ok_or("Missing runtime port")?
     );
-    let response = match client.post(&endpoint).set("Authorization", &format!("Bearer {}", &*token)).send_json(body) {
+    let response = match client.post(&endpoint).set("Authorization", &format!("Bearer {}", *token)).send_json(body) {
         Ok(r) | Err(ureq::Error::Status(400, r)) => r,
         Err(_) => return Err("MCP runtime is unavailable or authentication failed. Start the configured worker and verify its status.".into()),
     };
