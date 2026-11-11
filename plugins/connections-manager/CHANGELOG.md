@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+- Reuse the opt-in workspace management key in both Connections Manager pages.
+- Add Remember key on this device, tab-scoped login and Lock & forget.
+- Clear rejected credentials; retain saved keys during network failures and support storage-disabled browsers.
+- Gateway runtime remains 0.2.0; no runtime migration is required.
+
 ## 0.8.0
 
 - Built-in Cloudflare/Runway, approval-bound Wrangler/SSH/video requests, Bitwarden-backed native provider routes, conditional wizard and shared gateway 0.2.0.

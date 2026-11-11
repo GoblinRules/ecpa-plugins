@@ -1,10 +1,10 @@
 # Connections Manager
 
-Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.8.0.
+Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.8.1.
 
 ## Install
 
-Add the [ECPA Plugins registry](https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/registry.json), install **Connections Manager**, and open its page. Unlock with the proxy management key. The key is session-only; account tokens are stored in **Windows Credential Manager**, never in the catalogue or agent instructions.
+Add the [ECPA Plugins registry](https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/registry.json), install **Connections Manager**, and open its page. Unlock with the proxy management key. The management key can be remembered on this device; account tokens are stored in **Windows Credential Manager**, never in the catalogue or agent instructions.
 
 The release DLL includes its matching `ecpa-connect.exe`. When the plugin loads, it installs or updates one shared copy at:
 
@@ -198,3 +198,19 @@ with the core. No new global account switch is introduced.
 Update both the plugin and gateway bundle for these features; the DLL does not
 silently replace a running Python worker. See the [0.2 upgrade procedure](../../runtime/mcp-gateway/HOST-READINESS.md#upgrade-from-01-to-02)
 and [runtime contracts and limitations](../../runtime/mcp-gateway/README.md).
+
+## Remembered management login (0.8.1)
+
+Accounts & CLI and Shared services & providers reuse the workspace plugins' saved
+management key on the same proxy origin. Select **Remember key on this device**
+after a successful login to persist it; leave it unchecked to use tab-scoped session
+storage. Moving between the two pages or reopening their iframe no longer requires
+retyping the key when the saved browser storage is available.
+
+This is browser storage, not ECPA desktop single sign-on or an encrypted vault.
+Other pages on the same origin can access it. Only trusted plugins should share
+that origin. **Lock & forget** removes the shared remembered key and the Connections
+tab key; already-unlocked pages remain authenticated until closed/locked. A rejected
+key is removed automatically. Network failures keep it for retry, and disabled
+browser storage falls back to manually entering the key. Account/provider credentials
+are unaffected. Gateway 0.2.0 needs no reinstall for this UI patch.

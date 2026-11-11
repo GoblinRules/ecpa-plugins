@@ -38,6 +38,7 @@ jobs:
           $env:NODE_PATH = "$env:RUNNER_TEMP/ecpa-ui/node_modules"
           node "$env:NODE_PATH/playwright/cli.js" install chromium
           node tests/gateway-ui.cjs
+          node tests/connections-auth.cjs
       - run: python scripts/package.py
       - uses: actions/upload-artifact@v4
         with:
