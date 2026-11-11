@@ -1,0 +1,10 @@
+{
+  "id": "server-read",
+  "name": "Saved server",
+  "kind": "ssh",
+  "enabled": false,
+  "machine_id": "replace-with-saved-id",
+  "credential_refs": [],
+  "ssh_operations": {},
+  "allowed_tools": []
+}

@@ -19,3 +19,6 @@ machines.json
 machines.before.json
 connections.json
 
+
+# Private operation requests can contain prompts and machine inventory
+mcp-requests.json

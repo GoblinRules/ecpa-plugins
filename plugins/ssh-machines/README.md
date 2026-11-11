@@ -1,6 +1,6 @@
 # SSH & Machines
 
-Windows x64 native ECPA plugin, version 0.1.0. Manage named machine profiles and
+Windows x64 native ECPA plugin, version 0.2.0. Manage named machine profiles and
 verify their SSH identity from the ECPA host. It does not create a new job scheduler.
 
 ## Set up a machine
@@ -38,11 +38,17 @@ terminal on the ECPA host. It never launches a window automatically. An interact
 SSH terminal has whatever privileges the remote account grants and is **not read-only**.
 Prefer restricted target accounts and keys; the plugin does not create an OS sandbox.
 
-This first release is an administrator management surface. It exposes no arbitrary
-remote-command endpoint, agent SSH MCP, maintenance-command editor, secret resolver,
-file transfer, SSH tunnel or T3 runner registration. Labels are inventory metadata,
-not execution permissions. Use existing T3/environment registration for authorised
-jobs. Shared agent access requires a separate explicit policy/runner integration.
+For agent access, open Connections Manager 0.8.0 with gateway 0.2.0, add **Saved
+SSH machine**, and select the machine ID. Test/publish fixed diagnostics and, if
+needed, predefined service restarts. Assign explicit client/group/project grants.
+Each restart requires a separate human approval in Connections Manager. Requests
+bind the saved machine, selected identity file and host-key pin; changes require
+retesting. No arbitrary remote shell tool, file transfer, tunnel, software install
+or T3 runner registration is exposed. Use existing T3 runners for broader jobs.
+The shared Connections Manager helper executes these fixed operations; no extra
+per-machine executable is required. The runtime must run under the identity with
+access to the saved keys/agent and SSH catalogue.
+
 The existing Connections Manager/Bitwarden workflow remains the service-secret
 home; SSH uses existing keys/agent instead of introducing another credential vault.
 
@@ -79,5 +85,6 @@ python plugins/ssh-machines/tests/integration.py --core PATH_TO_TEST_CORE
 
 The integration uses an isolated core, temporary keys and a synthetic loopback SSH
 server. It checks authentication, key scanning/pinning, real SSH command execution,
-wrong-key rejection, stale-edit protection, export privacy and API boundaries.
+wrong-key rejection, stale-edit protection, export privacy, gateway machine bindings,
+approval-required restarts, replay rejection and API boundaries.
 No production SSH server, Windows account login, central host or T3 userdata is used.

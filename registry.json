@@ -108,7 +108,7 @@
     {
       "id": "connections-manager",
       "name": "Connections Manager",
-      "description": "Named service accounts and a shared MCP gateway, Bitwarden credential references, explicit tool/client policies and reversible agent setup.",
+      "description": "Named service accounts, Bitwarden-backed MCP and provider routing, Cloudflare/Runway adapters and approved jobs, with a shared local CLI helper.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-connections-manager",
       "homepage": "https://github.com/GoblinRules/ecpa-connections-manager",
@@ -151,7 +151,7 @@
     {
       "id": "ssh-machines",
       "name": "SSH & Machines",
-      "description": "Named SSH machine profiles, explicit key selection, pinned host keys and fixed read-only connection diagnostics.",
+      "description": "Named machines with pinned SSH identities, connection checks and terminal commands; shared gateway access supports approved service restarts.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-ssh-machines",
       "homepage": "https://github.com/GoblinRules/ecpa-ssh-machines",

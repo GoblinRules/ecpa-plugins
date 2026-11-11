@@ -72,3 +72,25 @@ The guard is a focused privacy check, not a substitute for a full secret scanner
 New releases must record their actual source commit. Do not upload a local data
 directory or a workspace ZIP made by indiscriminate recursive archiving. Release
 source archives must use `git archive` of the audited commit.
+
+
+## Shared integration update (2026-11-11)
+
+Connections Manager 0.8.0, gateway 0.2.0 and SSH & Machines 0.2.0 were checked
+against the same publication boundary. The staged source snapshot passed Gitleaks;
+the plugin ZIPs and gateway bundle passed private-file/build-path checks. Source
+and registry examples contain placeholders only. Private approval history is now
+explicitly excluded, and service references cannot select gateway authentication
+or Bitwarden bootstrap vault entries.
+
+Validation includes all 27 gateway tests with the clean Windows bundle installer
+and native core enabled, the Rust workspace tests/Clippy, five release-tool tests,
+headless wizard/navigation/embedded-width checks, and isolated native Connections
+and OpenSSH fixtures. Tests cover concurrent account selection, credential rotation,
+client revocation, stale configuration, single-use approvals, provider streaming
+and Responses translation. Paid generation, live provider inference, Cloudflare
+deployment and production SSH restarts were not run. Central-host deployment,
+private network exposure and unattended sign-out/reboot acceptance remain pending.
+
+These checks supplement the historical audit; they do not claim that all possible
+secret formats, third-party packages or future changes have been proven safe.

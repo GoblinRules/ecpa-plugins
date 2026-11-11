@@ -1,12 +1,20 @@
 {
-  "id": "runway-personal-read",
-  "name": "Runway personal adapter (review required)",
+  "id": "runway-personal",
+  "name": "Runway personal",
+  "kind": "runway",
   "service": "runway",
-  "kind": "stdio",
-  "transport": {"command":"C:\\Program Files\\nodejs\\node.exe","args":["C:\\ECPA\\connectors\\REVIEWED-RUNWAY-MCP\\index.js"],"package":"REPLACE-WITH-INSTALLED-PACKAGE","version":"REPLACE-WITH-REVIEWED-VERSION"},
   "enabled": false,
-  "credential_refs": [{"kind":"env","name":"RUNWAYML_API_SECRET","reference":{"provider":"bitwarden","region":"eu","secret_id":"00000000-0000-0000-0000-000000000000"}}],
-  "allowed_tools": [],
-  "access_group": "personal",
-  "project_ids": ["personal"]
+  "credential_refs": [
+    {
+      "kind": "env",
+      "name": "RUNWAYML_API_SECRET",
+      "reference": {
+        "provider": "bitwarden",
+        "region": "eu",
+        "secret_id": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  ],
+  "allow_video_requests": false,
+  "allowed_tools": []
 }

@@ -1,6 +1,6 @@
 # Connections Manager
 
-Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.7.0.
+Named Cloudflare, GitHub and Portainer connections for agents and tools, with a bundled helper and Windows Credential Manager storage. Windows x64, version 0.8.0.
 
 ## Install
 
@@ -59,7 +59,7 @@ GitHub CLI authentication is not a Git SSH identity manager. Git's SSH keys/HTTP
 
 The **Use with agents & tools** page generates PowerShell commands and Claude JSON or Codex TOML snippets. Select the separately installed MCP server executable and its arguments, then merge the generated server entry into the agent config. You can also paste the individual Claude server definition into MCP Manager's advanced editor and use its preview/apply flow. Tokens stay out of those files.
 
-The generator displays the selected account names/IDs and uses a distinct MCP entry name per account or project. It rejects missing credentials, helper self-launches and shell shims. Only Portainer has a built-in MCP server here. Cloudflare and GitHub require a compatible external stdio MCP server for this workflow; the helper itself, GitHub CLI and Wrangler are not those servers. Remote OAuth MCP endpoints belong in the agent’s own MCP setup.
+The generator displays the selected account names/IDs and uses a distinct MCP entry name per account or project. It rejects missing credentials, helper self-launches and shell shims. In this local-helper generator, only Portainer has a built-in MCP server. The separate shared gateway below also provides Cloudflare, Runway and SSH adapters. Cloudflare and GitHub require a compatible external stdio MCP server for this workflow; the helper itself, GitHub CLI and Wrangler are not those servers. Remote OAuth MCP endpoints belong in the agent’s own MCP setup.
 
 The helper passes through stdin/stdout and the child exit code; its account selection message goes to stderr, preserving stdio MCP framing. Only token-based servers accepting the listed environment variables are supported. Remote OAuth-only servers need their own login flow.
 
@@ -182,5 +182,19 @@ records/credentials are retained.
 
 A real Bitwarden-backed Portainer read through the authenticated gateway has now
 passed on the development PC. The final Windows central host, Tailscale TLS endpoint,
-reboot persistence, provider-key adapter and service-specific OAuth/Runway setup
-remain separate deployment/integration work. The gateway worker is a separate release asset; follow its host setup guide.
+reboot persistence and real service-specific OAuth/Runway/provider verification
+remain deployment checks. The gateway worker is a separate release asset; follow its host setup guide.
+
+## Shared services and providers (0.8.0)
+
+Gateway 0.2.0 adds built-in Cloudflare account reads, Runway balance/task reads,
+saved SSH machines and Bitwarden-backed model API keys. The guided setup shows
+only relevant fields. Optional Wrangler jobs, SSH restarts and paid video requests
+need explicit per-request approval in **Operation approvals**. Provider profiles
+publish named model aliases through CLIProxyAPI; core authentication applies,
+separately from MCP client/project permissions. Existing native OAuth profiles stay
+with the core. No new global account switch is introduced.
+
+Update both the plugin and gateway bundle for these features; the DLL does not
+silently replace a running Python worker. See the [0.2 upgrade procedure](../../runtime/mcp-gateway/HOST-READINESS.md#upgrade-from-01-to-02)
+and [runtime contracts and limitations](../../runtime/mcp-gateway/README.md).

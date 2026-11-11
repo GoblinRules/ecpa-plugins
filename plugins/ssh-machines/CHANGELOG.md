@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- Share verified machine operations with the gateway helper; bind identity contents and host pin; require per-request approval for named service restarts.
+- Existing local profiles and credentials are preserved; no automatic remote deployment.
+
 ## 0.1.0
 
 - Add a machine inventory and three-step setup wizard.

@@ -30,6 +30,26 @@ fn run() -> Result<i32, String> {
         connections_manager::portainer::serve_environment()?;
         return Ok(0);
     }
+    if action == "ssh-profile" || action == "ssh-operation" {
+        let machines = machine_access::Store::new(
+            dir.ok_or("Specify --data-dir for the SSH machine catalogue")?,
+        )?;
+        let id = args.next().ok_or("Supply the saved SSH machine ID")?;
+        let rest: Vec<_> = args.collect();
+        let result = if action == "ssh-profile" {
+            if !rest.is_empty() {
+                return Err("Unexpected SSH arguments".into());
+            }
+            machine_access::snapshot(&machines, &id)?
+        } else {
+            if rest.len() != 3 {
+                return Err("Supply exactly a revision, predefined operation and service name (empty for diagnostics)".into());
+            }
+            machine_access::operation(&machines, &id, &rest[0], &rest[1], &rest[2])?
+        };
+        println!("{}", result);
+        return Ok(0);
+    }
     let store = Store::new(match dir {
         Some(d) => d,
         None => store::default_dir()?,

@@ -110,6 +110,8 @@ def validate_reference(ref):
     elif provider == "windows-vault":
         if not isinstance(ref.get("target"), str) or not ref["target"].startswith("ECPA/"):
             raise SafeError("Choose an ECPA Windows credential target.")
+        if ref['target'].lower().startswith('ecpa/mcp/'):
+            raise SafeError('Gateway authentication and Bitwarden bootstrap credentials cannot be used as service bindings.')
         allowed = {"provider", "target"}
     else:
         raise SafeError("Supported credential sources are Bitwarden Secrets Manager and Windows Credential Manager.")
@@ -145,6 +147,8 @@ async def bounded_process(command, env, timeout=30):
 async def resolve(ref, config):
     validate_reference(ref)
     if ref["provider"] == "windows-vault":
+        if ref['target'].lower()==config.get('bws_vault_target','').lower():
+            raise SafeError('Bitwarden bootstrap credentials cannot be delivered to a service.')
         value = vault_get(ref["target"])
     else:
         cli = Path(config["bws_executable"])

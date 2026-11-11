@@ -17,7 +17,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 - **[Claude Remote Login](plugins/claude-remote-login/README.md)** — Review and confirm a Claude account before adding it to ECPA, with protected reauthorisation.
 - **[Z.ai Provider](plugins/zai-provider/README.md)** — Existing Coding Plan keys and explicitly configured optional browser login; no automatic key creation or client impersonation. Live provider/billing compatibility remains unverified.
 
-- **[Connections Manager](plugins/connections-manager/README.md)** — Named Cloudflare/GitHub accounts in Windows Credential Manager, project assignments and a CLI/MCP launcher shared across agents.
+- **[Connections Manager](plugins/connections-manager/README.md)** — Named service accounts, Bitwarden-backed MCP/provider routing, Cloudflare/Runway adapters and approval-controlled jobs, plus existing local CLI accounts.
 
 - **[Agent Instructions](plugins/agent-instructions/README.md)** — edit global instructions for Claude Code, Codex, Kimi Code, Grok Build, ZCode, and Antigravity. Includes backups, restore, conflict detection, and optional remembered login. Windows x64; tested with CLIProxyAPI v8.0.29.
 
@@ -30,7 +30,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Shared services and machine management
 
-- **[SSH & Machines](plugins/ssh-machines/README.md)** — Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks and terminal commands.
+- **[SSH & Machines](plugins/ssh-machines/README.md)** — Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks, terminal commands and approval-controlled gateway access.
 - **[Managed MCP gateway](runtime/mcp-gateway/README.md)** — Connections Manager's separately installed worker for Bitwarden-backed service profiles and authenticated client access.
 - **[Windows host readiness](runtime/mcp-gateway/HOST-READINESS.md)** — Required versus optional software, runtime identity/bootstrap, startup checks and hardware migration.
 - **[Publication privacy audit](docs/publication-security-audit.md)** — Checked scope, historical compiler-path findings and release safeguards.
@@ -80,6 +80,7 @@ plugins/
     scripts/                      Plugin-specific build entry point
 crates/agent-files/               Shared file protections and instruction paths
 crates/plugin-suite/              Shared native bridge, workflows and UI
+crates/machine-access/            Verified SSH operations shared by plugin/helper
 runtime/mcp-gateway/              SDK worker, profile templates, Windows setup and tests
 tests/                            Isolated suite integration/browser checks
 scripts/                          Shared validation and release packaging

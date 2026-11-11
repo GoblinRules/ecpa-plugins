@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- Built-in Cloudflare/Runway, approval-bound Wrangler/SSH/video requests, Bitwarden-backed native provider routes, conditional wizard and shared gateway 0.2.0.
+- Existing local profiles and credentials are preserved; no automatic remote deployment.
+
 ## 0.7.0
 
 - Add a management page and authenticated loopback bridge for the separate MCP SDK gateway.

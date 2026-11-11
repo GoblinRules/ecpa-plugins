@@ -13,7 +13,7 @@ from ecpa_gateway.security import auth_target
 def test_clean_windows_bundle_install(tmp_path):
     import win32cred
     root=Path(__file__).resolve().parents[3]
-    archive=root/'dist/mcp-gateway/ecpa-mcp-gateway_0.1.0_windows_bundle.zip'
+    archive=root/'dist/connections-manager/ecpa-mcp-gateway_0.2.0_windows_bundle.zip'
     source=tmp_path/'source';destination=tmp_path/'installed'
     with zipfile.ZipFile(archive) as z:
         assert all(not Path(n).is_absolute() and '..' not in Path(n).parts for n in z.namelist())

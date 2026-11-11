@@ -75,7 +75,7 @@ def validate_schema(schema):
 def validate_service(s):
     if not isinstance(s,dict) or not ID.fullmatch(s.get("id", "")) or not isinstance(s.get("name"),str) or not 1 <= len(s["name"]) <= 100:
         raise SafeError("Supply a stable lowercase service ID and a display name.")
-    if s.get("kind") not in ("portainer", "sample", "stdio", "http"):
+    if s.get("kind") not in ("portainer", "sample", "stdio", "http", "cloudflare", "runway", "ssh", "provider"):
         raise SafeError("Choose built-in Portainer, sample, installed stdio package or Streamable HTTP.")
     if not isinstance(s.get("enabled", False), bool):
         raise SafeError("Enabled must be boolean.")
@@ -89,10 +89,18 @@ def validate_service(s):
     for key,value in public_env.items():
         if not ENV.fullmatch(key) or SENSITIVE.search(key) or key in RUNTIME_ENV or key in ('PYTHONPATH','PYTHONHOME','NODE_OPTIONS','LD_PRELOAD','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY') or not isinstance(value,str) or len(value)>1024:
             raise SafeError('Use only non-secret connector settings; execution and proxy overrides are not allowed.')
-    if s.get('service')=='cloudflare':
+    if s.get('service')=='cloudflare' or s['kind']=='cloudflare':
         if not re.fullmatch(r'[0-9a-fA-F]{32}',s.get('account_id','')):raise SafeError('Cloudflare profiles require a 32-character account ID.')
         if public_env.get('CLOUDFLARE_ACCOUNT_ID',s['account_id'])!=s['account_id']:raise SafeError('Conflicting Cloudflare account bindings.')
     refs = s.get("credential_refs", [])
+    if s.get('wrangler',{}).get('agent_operations'):
+        w=s['wrangler']
+        if s['kind']!='cloudflare' or not isinstance(w['agent_operations'],list) or set(w['agent_operations'])-{'verify','dry-run','deploy'}:
+            raise SafeError('Agent Wrangler operations must be explicit verify, dry-run or deploy operations on a Cloudflare profile.')
+        if not isinstance(w.get('workspace_ids'),list) or not w['workspace_ids'] or any(not ID.fullmatch(x) for x in w['workspace_ids']):
+            raise SafeError('Assign explicit trusted workspace IDs before enabling Wrangler requests.')
+        for key in ('node_executable','entrypoint'):
+            if not isinstance(w.get(key),str) or not Path(w[key]).is_absolute():raise SafeError('Wrangler needs absolute installed Node and entrypoint paths.')
     if s.get('oauth'):
         if s['kind']!='http' or refs:raise SafeError('OAuth is supported for hosted MCP endpoints and cannot be mixed with API-key bindings.')
         settings=s['oauth']
@@ -119,7 +127,26 @@ def validate_service(s):
     transport = s.get("transport", {})
     if s["kind"] in ("http", "portainer"):
         validate_url(s.get("url", ""),origin_only=s["kind"]=="portainer",private_http=s.get("private_network_http") is True)
-    if s["kind"] == "portainer":
+    if s['kind'] in ('cloudflare','runway','provider'):
+        expected={'cloudflare':('env','CLOUDFLARE_API_TOKEN'),'runway':('env','RUNWAYML_API_SECRET'),'provider':('header','Authorization')}[s['kind']]
+        if len(refs)!=1 or (refs[0]['kind'],refs[0]['name'])!=expected or s.get('oauth'):
+            raise SafeError('This built-in adapter requires its one explicit API-key reference. Use hosted MCP for OAuth.')
+        if s['kind']=='provider':
+            from .providers import validate
+            validate(s)
+        if s['kind']=='runway' and not isinstance(s.get('allow_video_requests',False),bool):
+            raise SafeError('Video request permission must be boolean.')
+    elif s['kind']=='ssh':
+        if refs or not re.fullmatch('[a-z0-9][a-z0-9-]{0,47}',s.get('machine_id','')):
+            raise SafeError('Choose one saved SSH machine ID; credentials stay with its existing key/agent.')
+        revision=s.get('machine_revision','')
+        if revision and not re.fullmatch('[a-f0-9]{64}',revision):raise SafeError('Invalid machine revision.')
+        operations=s.get('ssh_operations',{})
+        if not isinstance(operations,dict) or len(operations)>10:raise SafeError('Choose at most ten predefined SSH operations.')
+        for key,op in operations.items():
+            if not ID.fullmatch(key) or not isinstance(op,dict) or set(op)!={'action','service'} or op['action']!='restart-service' or not re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.@-]{0,63}',op.get('service','')):
+                raise SafeError('SSH operations support explicit service restarts only; shell commands and arguments are not accepted.')
+    elif s["kind"] == "portainer":
         if len(refs)!=1 or refs[0]["name"]!="PORTAINER_API_KEY" or refs[0]["kind"]!="env":
             raise SafeError("Portainer needs one PORTAINER_API_KEY credential reference.")
     elif s["kind"] == "sample":
@@ -148,8 +175,10 @@ def validate_service(s):
         raise SafeError('Choose a shorter profile ID so each published tool name fits the 64-character client limit.')
     if s["kind"]=="portainer" and set(s.get("allowed_tools",[]))-set(PORTAINER_TOOLS):
         raise SafeError("Portainer exposes only its implemented read-only tools.")
-    if s.get("enabled") and (not s.get("allowed_tools") or not s.get("reviewed_read_only")):
-        raise SafeError("Review the selected read-only operations before publishing.")
+    if s.get('enabled') and s['kind']!='provider':
+        if not s.get('allowed_tools') or not (s.get('reviewed_read_only') or s.get('reviewed_policy')):
+            raise SafeError('Review the selected operations and their approval policy before publishing.')
+        if s['kind']=='ssh' and not s.get('machine_revision'):raise SafeError('Verify the saved machine before publishing.')
     for tool in s.get('tools',[]):
         validate_schema(tool.get('inputSchema',{}))
         if tool.get('outputSchema') is not None:validate_schema(tool['outputSchema'])
@@ -193,6 +222,11 @@ class Registry:
         old=next((s for s in data['services'] if s['id']==service['id']),{})
         # Preserve extension fields not touched by the editor.
         merged={**old,**copy.deepcopy(service)}
+        # Missing owned optional fields mean removal, rather than resurrecting a
+        # previous OAuth session/operation policy after the wizard turned it off.
+        for key in ('oauth','wrangler','transport','url','private_network_http','provider_preset','provider_url',
+                    'models','machine_id','machine_revision','ssh_operations','allow_video_requests','tools'):
+            if key not in service:merged.pop(key,None)
         validate_service(merged)
         data['services']=[s for s in data['services'] if s['id']!=service['id']]+[merged]
         return self.commit(data,expected)

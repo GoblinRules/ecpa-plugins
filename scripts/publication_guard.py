@@ -7,7 +7,7 @@ import subprocess
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-PRIVATE_NAMES={'machines.json','machines.before.json','connections.json','gateway-runtime.json','mcp-services.json','oauth.json','credentials.json','id_rsa','id_ed25519','.env'}
+PRIVATE_NAMES={'mcp-requests.json','machines.json','machines.before.json','connections.json','gateway-runtime.json','mcp-services.json','oauth.json','credentials.json','id_rsa','id_ed25519','.env'}
 
 
 def findings(path,data):

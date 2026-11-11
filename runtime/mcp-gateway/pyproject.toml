@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecpa-mcp-gateway"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.12"
 dependencies = ["mcp==1.30.0", "uvicorn==0.54.0", "tomlkit==0.15.0", "portalocker==3.2.0", "json5==0.12.1", "pywin32==312; sys_platform == 'win32'"]
 

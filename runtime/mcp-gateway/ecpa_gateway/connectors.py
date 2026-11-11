@@ -76,6 +76,9 @@ def scrub(raw,values):
 
 async def discover(service,config):
     try:
+        if service['kind'] in ('cloudflare','runway','ssh'):
+            from .service_api import verify
+            return await verify(service,config)
         async with asyncio.timeout(45):
             async with connection(service,config) as (session,values):
                 return await reviewed_tools(session,values)
@@ -84,12 +87,29 @@ async def discover(service,config):
         raise SafeError('MCP initialize/tool discovery failed. Check installation, URL, credential access and transport.') from None
 
 
-async def invoke(service,config,name,arguments):
+async def invoke(service,config,name,arguments,controller=None,identity=None):
+    if service.get('execution_host',config.get('host_id'))!=config.get('host_id'):
+        raise SafeError('Profile belongs to a different execution host.')
     if not service.get('enabled') or name not in service.get('allowed_tools',[]):
         raise SafeError('Tool is not permitted by this service policy.')
     snapshot=next((t for t in service.get('tools',[]) if t['name']==name),None)
     if snapshot is None:raise SafeError('Tool has not been reviewed. Test and publish the service again.')
     check_account_arguments(service,arguments)
+    if service['kind'] in ('cloudflare','runway','ssh'):
+        from . import service_api
+        current=next((t for t in service_api.tools(service) if t['name']==name),None)
+        if current is None or tool_hash(current)!=tool_hash(snapshot):
+            raise SafeError('Built-in tool contract changed. Test and publish the profile again.')
+        if name in ('request_video','request_operation','request_wrangler'):
+            if controller is None or identity is None:raise SafeError('An authenticated client is required.')
+            result=controller.approvals.propose(identity,service,name,arguments)
+        elif name=='request_status':
+            result=controller.approvals.status(identity,service['id'],arguments['request_id'])
+        elif service['kind']=='ssh':
+            from .ssh import operation
+            result=await operation(service,config,name)
+        else:result=await service_api.read(service,config,name,arguments)
+        return types.CallToolResult(content=[types.TextContent(type='text',text=json.dumps(result))])
     try:
         async with asyncio.timeout(45):
             async with connection(service,config) as (session,values):

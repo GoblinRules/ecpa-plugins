@@ -8,8 +8,37 @@ import subprocess
 import signal
 import tempfile
 import tomllib
+import hashlib
 import json5
 from .security import SafeError, clean_env, resolve
+
+AGENT_OPERATIONS={'verify':['whoami'], 'dry-run':['deploy','--dry-run'], 'deploy':['deploy']}
+
+
+def approval_context(service, config, workspace_id, operation):
+    settings=service.get('wrangler',{})
+    if operation not in settings.get('agent_operations',[]):raise SafeError('Wrangler operation is not enabled for agent requests.')
+    if operation not in AGENT_OPERATIONS:raise SafeError('Unknown managed Wrangler operation.')
+    root=checked_workspace(service,config,workspace_id)
+    path=check_wrangler_config(root,service)
+    # Bind source/config files, plus the explicitly installed launcher. Dependencies
+    # remain trusted administrator-managed software, not an agent-editable sandbox.
+    hashed=hashlib.sha256();total=0;count=0
+    for parent,dirs,files in os.walk(root,followlinks=False):
+        dirs[:]=sorted(d for d in dirs if d not in ('.git','node_modules','.wrangler'))
+        if any((Path(parent)/d).is_symlink() or (hasattr(Path(parent)/d,'is_junction') and (Path(parent)/d).is_junction()) for d in dirs):
+            raise SafeError('Managed workspaces cannot contain directory links.')
+        for name in sorted(files):
+            item=Path(parent)/name
+            if item.is_symlink():raise SafeError('Managed workspaces cannot contain file links.')
+            count+=1;total+=item.stat().st_size
+            if count>5000 or total>100*1024*1024:raise SafeError('Workspace exceeds the approval snapshot limit; use a smaller reviewed workspace.')
+            hashed.update(str(item.relative_to(root)).encode());hashed.update(item.read_bytes())
+    entry=Path(settings['entrypoint'])
+    if not entry.is_file() or entry.stat().st_size>20*1024*1024:raise SafeError('Installed Wrangler entrypoint is unavailable or too large.')
+    hashed.update(entry.read_bytes())
+    return {'workspace_id':workspace_id,'workspace':str(root),'config':str(path),'source_revision':hashed.hexdigest(),
+            'account_id':service['account_id'],'operation':operation,'host':config['host_id']}
 
 
 def checked_workspace(service,config,workspace_id):
@@ -50,13 +79,13 @@ def check_wrangler_config(root,profile):
     return path
 
 
-async def run_wrangler(service,config,workspace_id,operation):
+async def run_wrangler(service,config,workspace_id,operation,*,approved=False):
     if not service.get('enabled') or service.get('execution_host',config.get('host_id'))!=config.get('host_id'):
         raise SafeError('Profile is disabled or belongs to another execution host.')
     root=checked_workspace(service,config,workspace_id)
     path=check_wrangler_config(root,service)
     settings=service['wrangler']
-    commands=settings.get('operations',{'verify':['whoami']})
+    commands=AGENT_OPERATIONS if approved else settings.get('operations',{'verify':['whoami']})
     args=commands.get(operation)
     if not args or not isinstance(args,list) or not all(isinstance(a,str) for a in args):raise SafeError('Operation was not explicitly approved for this profile.')
     if any(a.split('=')[0] in ('--config','-c','--cwd','--env','-e','--profile','--account-id') for a in args):raise SafeError('Operation arguments cannot override the profile account, environment or workspace.')

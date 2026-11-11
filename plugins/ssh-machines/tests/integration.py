@@ -50,7 +50,7 @@ class SSHFixture:
             def check_channel_request(self,kind,chanid):return paramiko.OPEN_SUCCEEDED if kind=='session' else paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
             def check_channel_exec_request(self,channel,command):
                 self.command=command.decode();fixture.commands.append(self.command);self.event.set()
-                return self.command=='uname -s; id -un'
+                return self.command in ('uname -s; id -un', "systemctl restart -- 'nginx' && printf 'Service restart completed\\n'")
         transport=paramiko.Transport(conn);transport.add_server_key(self.key);server=Server()
         try:
             transport.start_server(server=server);channel=transport.accept(5)
@@ -105,21 +105,50 @@ with tempfile.TemporaryDirectory(prefix='ecpa ssh fixture-') as folder:
         assert code==200,(raw.decode(),fixture.commands)
         result=json.loads(raw);assert result['connected'] and 'fixture-user' in result['diagnostic']
         assert fixture.commands==['uname -s; id -un']
+        # Reuse the exact saved machine through the gateway's single shared helper.
+        from ecpa_gateway.app import Controller
+        from ecpa_gateway.registry import atomic,encode
+        from ecpa_gateway.security import token_digest,SafeError
+        gateway_path=home/'gateway/gateway-runtime.json'
+        atomic(gateway_path,encode({'host_id':'fixture-runtime','data_dir':str(gateway_path.parent),
+            'helper_executable':str(ROOT/'target/release/ecpa-connect.exe'),'ssh_data_dir':str(home/'data'),
+            'identities':{'fixture-client':{'sha256':token_digest('fixture-gateway-client'),'services':['machine-fixture']}}}))
+        controller=Controller(gateway_path)
+        async def gateway_scenario():
+            definition={'id':'machine-fixture','name':'Machine fixture','kind':'ssh','machine_id':'fixture','execution_host':'fixture-runtime',
+                'enabled':False,'credential_refs':[],'allowed_tools':[],
+                'ssh_operations':{'restart-web':{'action':'restart-service','service':'nginx'}}}
+            review=await controller.admin({'action':'test','service':definition})
+            _,version=controller.registry.load()
+            await controller.admin({'action':'publish','review':review['review'],'version':version,'allowed_tools':['diagnostics','request_operation','request_status'],'confirm_read_only':True})
+            assert fixture.commands==['uname -s; id -un']*2
+            requested=await controller.call('fixture-client','machine-fixture__request_operation',{'operation':'restart-web'})
+            record=json.loads(requested.content[0].text)
+            assert len(fixture.commands)==2,'Operation executed before approval'
+            result=await controller.admin({'action':'approve-request','id':record['request_id'],'confirm':True})
+            assert result['status']=='completed',result
+            assert fixture.commands[-1]=="systemctl restart -- 'nginx' && printf 'Service restart completed\\n'"
+            try:await controller.admin({'action':'approve-request','id':record['request_id'],'confirm':True})
+            except SafeError:pass
+            else:raise AssertionError('Approval was replayed')
+            assert len(fixture.commands)==3
+        __import__('asyncio').run(gateway_scenario())
+        expected_commands=list(fixture.commands)
         terminal=call('terminal',id='fixture');assert 'StrictHostKeyChecking=yes' in terminal['command'] and 'ProxyCommand=none' in terminal['command']
         assert request('/v0/management/ssh-machines/action',{'action':'delete','id':'fixture','version':version})[0]==400
         wrong_client=paramiko.RSAKey.generate(2048);wrong_path=home/'wrong-client-key';wrong_client.write_private_key_file(str(wrong_path));protect_private_key(wrong_path)
         wrong_identity={**machine,'identity_file':str(wrong_path)}
         state=call('save',machine=wrong_identity,version=state['version'],reviewed_fingerprint=fp)
         assert request('/v0/management/ssh-machines/action',{'action':'test','id':'fixture'})[0]==400
-        assert fixture.commands==['uname -s; id -un'],'Wrong key fell back to a different account identity'
+        assert fixture.commands==expected_commands,'Wrong key fell back to a different account identity'
         changed=paramiko.RSAKey.generate(2048);bad={**machine,'host_key':'ssh-rsa '+changed.get_base64()}
         bad_fp='SHA256:'+base64.b64encode(hashlib.sha256(changed.asbytes()).digest()).decode().rstrip('=')
         state=call('save',machine=bad,version=state['version'],reviewed_fingerprint=bad_fp)
         assert request('/v0/management/ssh-machines/action',{'action':'test','id':'fixture'})[0]==400
-        assert fixture.commands==['uname -s; id -un'],'Wrong host key reached remote execution'
+        assert fixture.commands==expected_commands,'Wrong host key reached remote execution'
         export=json.dumps(call('export'));assert 'PRIVATE KEY' not in export
         assert request('/v0/management/ssh-machines/action',{'action':'run','command':'anything'})[0]==400
         call('delete',id='fixture',version=state['version']);assert not call()['machines']
-        print('PASS: isolated native core + real OpenSSH handshake/diagnostics, pinned-key rejection, explicit identity, private route boundary, stale edits and no arbitrary command API')
+        print('PASS: isolated native core + real OpenSSH handshake/diagnostics, pinned-key rejection, explicit identity, private route boundary, stale edits single-use gateway approval, and no arbitrary command API')
     finally:
         process.terminate();process.wait(timeout=10);fixture.close()

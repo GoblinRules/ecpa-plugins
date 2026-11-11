@@ -1,0 +1,26 @@
+{
+  "id": "xai-work",
+  "name": "xAI work",
+  "kind": "provider",
+  "enabled": false,
+  "provider_preset": "xai",
+  "provider_url": "https://api.x.ai/v1",
+  "models": [
+    {
+      "alias": "primary",
+      "model": "REPLACE-WITH-MODEL-ID"
+    }
+  ],
+  "credential_refs": [
+    {
+      "kind": "header",
+      "name": "Authorization",
+      "reference": {
+        "provider": "bitwarden",
+        "region": "eu",
+        "secret_id": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  ],
+  "allowed_tools": []
+}

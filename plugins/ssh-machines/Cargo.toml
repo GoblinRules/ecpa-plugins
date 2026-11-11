@@ -1,6 +1,6 @@
 [package]
 name = "ssh-machines"
-version = "0.1.0"
+version = "0.2.0"
 repository = "https://github.com/GoblinRules/ecpa-ssh-machines"
 edition = "2021"
 license = "MIT"
@@ -10,10 +10,11 @@ description = "Named SSH machine profiles with pinned host keys and read-only co
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+machine-access = { path = "../../crates/machine-access" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml_ng = "0.10"
 base64 = "0.22"
-sha2 = "0.10"
+
+[dev-dependencies]
 tempfile = "3"
-fs2 = "0.4"

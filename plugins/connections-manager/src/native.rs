@@ -3,7 +3,54 @@ use serde_json::json;
 use std::{
     ffi::{c_char, c_void, CStr},
     ptr,
+    sync::{Mutex, OnceLock},
 };
+#[derive(Clone, Copy)]
+struct Callbacks {
+    context: usize,
+    call: HostCall,
+    free: unsafe extern "C" fn(*mut c_void, usize),
+}
+static CALLBACKS: OnceLock<Mutex<Option<Callbacks>>> = OnceLock::new();
+
+pub(crate) fn host(method: &str, value: &serde_json::Value) -> bool {
+    let callback = CALLBACKS
+        .get()
+        .and_then(|lock| lock.lock().ok().and_then(|v| *v));
+    let Some(callback) = callback else {
+        return false;
+    };
+    let Ok(method) = std::ffi::CString::new(method) else {
+        return false;
+    };
+    let bytes = value.to_string().into_bytes();
+    let mut output = Buffer {
+        ptr: ptr::null_mut(),
+        len: 0,
+    };
+    unsafe {
+        let code = (callback.call)(
+            callback.context as *mut c_void,
+            method.as_ptr(),
+            bytes.as_ptr(),
+            bytes.len(),
+            &mut output,
+        );
+        let success = if code == 0 && !output.ptr.is_null() && output.len <= 1024 * 1024 {
+            serde_json::from_slice::<serde_json::Value>(std::slice::from_raw_parts(
+                output.ptr, output.len,
+            ))
+            .map(|result| result["ok"] == true)
+            .unwrap_or(false)
+        } else {
+            false
+        };
+        if !output.ptr.is_null() {
+            (callback.free)(output.ptr as *mut c_void, output.len);
+        }
+        success
+    }
+}
 #[repr(C)]
 pub struct Buffer {
     ptr: *mut u8,
@@ -35,6 +82,15 @@ pub unsafe extern "C" fn cliproxy_plugin_init(host: *const HostApi, plugin: *mut
     if host.is_null() || plugin.is_null() || (*host).abi_version != 1 {
         return 1;
     }
+    if let (Some(call), Some(free)) = ((*host).call, (*host).free_buffer) {
+        if let Ok(mut callbacks) = CALLBACKS.get_or_init(|| Mutex::new(None)).lock() {
+            *callbacks = Some(Callbacks {
+                context: (*host).host_ctx as usize,
+                call,
+                free,
+            });
+        }
+    }
     ptr::write(
         plugin,
         PluginApi {
@@ -62,11 +118,14 @@ unsafe extern "C" fn call(
             len: 0,
         },
     );
-    if method.is_null() || len > 64 * 1024 || (request.is_null() && len != 0) {
+    if method.is_null() || len > 2 * 1024 * 1024 || (request.is_null() && len != 0) {
         return 1;
     }
     let result = std::panic::catch_unwind(|| {
         let method = CStr::from_ptr(method).to_str().unwrap_or("");
+        if len > 64 * 1024 && !matches!(method, "executor.execute" | "executor.execute_stream") {
+            return json!({"ok":false,"error":{"code":"request_too_large","message":"Plugin request exceeds its limit"}});
+        }
         let bytes = if len == 0 { &[] } else { std::slice::from_raw_parts(request, len) };
         dispatch(method, bytes)
     }).unwrap_or_else(|_| json!({"ok": false, "error": {"code": "plugin_error", "message": "Plugin operation failed"}}));

@@ -23,6 +23,8 @@ from . import VERSION, clients
 from .security import SafeError, authenticate, validate_url
 from .registry import Registry, validate_service, encode, digest, atomic
 from .connectors import discover, invoke
+from .approvals import Approvals
+from . import providers
 
 principal=ContextVar('ecpa_principal',default=None)
 
@@ -34,6 +36,7 @@ class Controller:
         self.reviews={}
         self.client_reviews={}
         self.limit=asyncio.Semaphore(8)
+        self.approvals=Approvals(self)
 
     def config(self):
         return json.loads(self.config_path.read_bytes())
@@ -77,7 +80,7 @@ class Controller:
             try:jsonschema.validate(arguments,schema)
             except Exception:raise SafeError('Tool arguments do not match the approved schema.') from None
             async with self.limit:
-                result=await invoke(service,self.config(),tool,arguments)
+                result=await invoke(service,self.config(),tool,arguments,self,identity)
                 outcome='error' if result.isError else 'ok'
                 return result
         except SafeError as error:
@@ -111,18 +114,30 @@ class Controller:
         self.expire()
         action=body.get('action')
         config=self.config()
+        if action=='provider-models':return providers.model_catalogue(self.registry)
+        if action=='requests':return {'requests':self.approvals.inventory()}
+        if action in ('approve-request','reject-request'):
+            return await self.approvals.decide(body['id'],action=='approve-request',body.get('confirm'))
         if action=='state':
             data,version=self.registry.load()
             return {'services':data['services'],'version':version,'backups':self.registry.backups(),
                 'clients':[{'id':k,'services':v.get('services',[]),'groups':v.get('groups',['default']),'project_ids':v.get('project_ids',[])} for k,v in config['identities'].items() if k!='admin'],
                 'inventory':clients.inventory(config),'runtime':{'version':VERSION,'mode':'local Windows' if __import__('os').name=='nt' else 'Linux worker',
                     'url':config['url'],'host_id':config.get('host_id','local-pilot'),'bws_executable':config['bws_executable'],'helper_executable':config['helper_executable'],
-                    'client_paths':config.get('client_paths',{}),'config_version':digest(self.config_path.read_bytes())}}
+                    'client_paths':config.get('client_paths',{}),'ssh_data_dir':config.get('ssh_data_dir',str(self.registry.dir.parent/'ssh-machines')),
+                    'workspaces':config.get('workspaces',{}),
+                    'config_version':digest(self.config_path.read_bytes())}}
         if action=='test':
             service=copy.deepcopy(body['service'])
             service['enabled']=False
             service.pop('tools',None)
             validate_service(service)
+            if service['kind']=='provider':
+                async with self.limit:verification=await providers.verify(service,config)
+                if len(self.reviews)>=32:raise SafeError('Too many pending reviews.')
+                receipt=secrets.token_urlsafe(24)
+                self.reviews[receipt]={'service':service,'tools':[],'expires':time.monotonic()+600}
+                return {'review':receipt,'tools':[],**verification,'message':'Model catalogue verified without inference. Publishing exposes these aliases through this CLIProxyAPI core; its client authentication applies. No MCP permission is substituted.'}
             async with self.limit:tools=await discover(service,config)
             if len(self.reviews)>=32:raise SafeError('Too many pending reviews; finish one or wait for expiry.')
             receipt=secrets.token_urlsafe(24)
@@ -131,12 +146,20 @@ class Controller:
         if action=='publish':
             review=self.reviews.get(body.get('review'))
             if not review:raise SafeError('Test review expired. Test the connector again.')
-            if body.get('confirm_read_only') is not True:raise SafeError('Confirm that the selected operations have been reviewed as read-only.')
+            if review['service']['kind']=='provider':
+                if body.get('confirm_core_access') is not True:raise SafeError('Confirm access through the authenticated CLIProxyAPI core before publishing models.')
+                service={**review['service'],'enabled':True,'core_access_confirmed':True}
+                version=self.registry.save(service,body.get('version'));del self.reviews[body['review']]
+                return {'version':version,'saved':service['id'],'message':'Provider saved. Reload Connections Manager/core model registration to advertise the aliases. Disabling the profile blocks new requests immediately.'}
+            if body.get('confirm_read_only') is not True:raise SafeError('Review the selected operations and their approval policy.')
             selected=body.get('allowed_tools',[])
             if not isinstance(selected,list) or not selected or set(selected)-{t['name'] for t in review['tools']}:
                 raise SafeError('Select at least one discovered tool.')
             service={**review['service'],'enabled':True,'allowed_tools':selected,'reviewed_read_only':True,
                      'tools':[t for t in review['tools'] if t['name'] in selected]}
+            if any(t.get('annotations',{}).get('readOnlyHint') is False for t in service['tools']):
+                if service['kind'] in ('http','stdio'):raise SafeError('Generic tools marked as mutating cannot be published. Use a reviewed adapter with an enforced approval policy.')
+                service['reviewed_read_only']=False;service['reviewed_policy']=True
             version=self.registry.save(service,body.get('version'))
             del self.reviews[body['review']]
             return {'version':version,'saved':service['id']}
@@ -189,6 +212,19 @@ class Controller:
                     for value in paths.values():
                         if not isinstance(value,str) or not Path(value).is_absolute() or Path(value).is_dir():raise SafeError('Client destinations must be absolute file paths.')
                     config['client_paths']=paths
+                if 'ssh_data_dir' in body:
+                    if body['ssh_data_dir']:
+                        path=Path(body['ssh_data_dir'])
+                        if not path.is_absolute():raise SafeError('Choose an absolute SSH machine catalogue directory.')
+                        config['ssh_data_dir']=str(path)
+                    else:config.pop('ssh_data_dir',None)
+                if 'workspaces' in body:
+                    from .registry import ID
+                    workspaces=body['workspaces']
+                    if not isinstance(workspaces,dict) or len(workspaces)>30:raise SafeError('Use at most thirty trusted workspace mappings.')
+                    for key,value in workspaces.items():
+                        if not ID.fullmatch(key) or not isinstance(value,str) or not Path(value).is_absolute() or not Path(value).is_dir():raise SafeError('Workspace IDs must map to existing absolute directories on this runtime host.')
+                    config['workspaces']=workspaces
                 atomic(self.config_path,encode(config))
             return {'saved':True}
         if action=='activity':
@@ -236,11 +272,16 @@ def create_app(config_path):
         except SafeError as error:return JSONResponse({'error':str(error)},status_code=400)
         except Exception:return JSONResponse({'error':'Management operation failed; internal details were suppressed.'},status_code=400)
 
+    async def provider(request):
+        try:return await providers.execute(controller,await request.json())
+        except SafeError as error:return JSONResponse({'error':str(error)},status_code=502)
+        except Exception:return JSONResponse({'error':'Provider request failed; internal details were suppressed.'},status_code=502)
+
     @asynccontextmanager
     async def lifespan(app):
         async with manager.run():yield
 
-    app=Starlette(routes=[Route('/mcp',MCP(),methods=['POST','GET','DELETE']),Route('/admin',admin,methods=['POST'])],lifespan=lifespan)
+    app=Starlette(routes=[Route('/mcp',MCP(),methods=['POST','GET','DELETE']),Route('/admin',admin,methods=['POST']),Route('/provider',provider,methods=['POST'])],lifespan=lifespan)
 
     class Guard:
         def __init__(self):self.controller=controller;self.app=app
@@ -249,7 +290,7 @@ def create_app(config_path):
             headers={k.decode().lower():v.decode() for k,v in scope['headers']}
             cfg=controller.config()
             identity=authenticate(cfg,headers.get('authorization',''))
-            management=scope['path']=='/admin'
+            management=scope['path'] in ('/admin','/provider')
             peer=(scope.get('client') or ('',))[0]
             if not identity or (management and (identity!='admin' or peer not in ('127.0.0.1','::1','testclient'))) or (not management and identity=='admin'):
                 return await JSONResponse({'error':'Authentication required.'},status_code=401)(scope,receive,send)
@@ -261,7 +302,8 @@ def create_app(config_path):
                 message=await receive()
                 if message['type']=='http.disconnect':return
                 size+=len(message.get('body',b''))
-                if size>65536:return await JSONResponse({'error':'Request too large.'},status_code=413)(scope,receive,send)
+                limit=262144 if scope['path']=='/provider' else 65536
+                if size>limit:return await JSONResponse({'error':'Request too large.'},status_code=413)(scope,receive,send)
                 chunks.append(message.get('body',b''))
                 if not message.get('more_body'):break
             delivered=False

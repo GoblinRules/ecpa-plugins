@@ -113,3 +113,17 @@ Agent Instructions switches to an icon-bearing agent/file selector inside an ifr
 Browser validation covers real-core save/preview/restore workflows and 1000, 820 and 375px iframe widths at 560px height. Use `tests/embedded-layout-check.js` in a same-origin test host containing an unlocked editor iframe to repeat layout checks. Do not run workflow tests against real user files.
 
 `tests/reference-layout.cjs` runs these checks at 560px and 800px heights, verifies that desktop sidebars remain beside the editor, captures screenshots, and runs the existing browser workflows for all seven plugins. It uses Playwright with Edge (`PLAYWRIGHT_MODULE` can point to an installed module) and an isolated same-origin proxy host at `PLUGIN_PREVIEW_URL` (default `http://127.0.0.1:58610`). Screenshots go to `dist/screenshots` or `PLUGIN_SCREENSHOT_DIR`.
+
+
+## Shared services and approved operations
+
+Connections Manager 0.8.0 with gateway 0.2.0 is the managed account/runtime surface.
+MCP Manager remains the individual client-config editor. Register the shared gateway
+once per client, then grant named profiles. Built-in Cloudflare/Runway reads and
+SSH diagnostics appear only for permitted profiles. Optional video, Wrangler and
+service-restart tools create requests; an administrator approves the exact request
+in Connections Manager. No tool exposes a generic shell or a secret-reading API.
+
+Provider model aliases use CLIProxyAPI's separate client authentication; MCP grants
+do not constrain those requests. See the [runtime guide](../runtime/mcp-gateway/README.md)
+for API-key references, OAuth distinctions, workspaces and execution locations.

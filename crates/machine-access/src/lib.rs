@@ -1,3 +1,4 @@
+//! Verified machine profiles shared by the management plugin and runtime helper.
 use base64::{
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD},
     Engine,
@@ -452,5 +453,75 @@ pub fn test(store: &Store, selected: &str) -> Result<Value, String> {
     let output = run(&ssh_path("ssh"), &ssh_args(&m, &keypath, false))?;
     Ok(
         json!({"id":m.id,"connected":true,"host":m.host,"user":m.user,"fingerprint":fingerprint(&m.host_key)?,"elapsedMs":started.elapsed().as_millis(),"diagnostic":output,"message":"Pinned host key and public-key authentication succeeded. Fixed OS/user read only; no runner installed or machine changed."}),
+    )
+}
+
+fn machine_revision(machine: &Machine) -> Result<String, String> {
+    let mut bytes = serde_json::to_vec(machine).map_err(|_| "Cannot encode machine profile")?;
+    let file =
+        fs::File::open(&machine.identity_file).map_err(|_| "Cannot read selected identity")?;
+    let mut identity = Vec::new();
+    file.take(65537)
+        .read_to_end(&mut identity)
+        .map_err(|_| "Cannot read selected identity")?;
+    if identity.len() > 65536 {
+        return Err("Selected identity file is too large".into());
+    }
+    bytes.extend(Sha256::digest(&identity));
+    Ok(hash(&bytes))
+}
+
+pub fn snapshot(store: &Store, selected: &str) -> Result<Value, String> {
+    let m = store.selected(selected)?;
+    validate(&m)?;
+    let revision = machine_revision(&m)?;
+    Ok(
+        json!({"id":m.id,"name":m.name,"host":m.host,"user":m.user,"os":m.os,
+        "fingerprint":fingerprint(&m.host_key)?,"revision":revision}),
+    )
+}
+
+/// Execute only one predefined operation against an unchanged, pinned machine.
+pub fn operation(
+    store: &Store,
+    selected: &str,
+    revision: &str,
+    action: &str,
+    service: &str,
+) -> Result<Value, String> {
+    let m = store.selected(selected)?;
+    validate(&m)?;
+    if machine_revision(&m)? != revision {
+        return Err("Machine profile changed. Test and publish its gateway profile again.".into());
+    }
+    let remote = match action {
+        "diagnostics" if service.is_empty() => None,
+        "restart-service"
+            if !service.is_empty()
+                && service.len() <= 64
+                && service.as_bytes()[0].is_ascii_alphanumeric()
+                && service
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"_.@-".contains(&c)) =>
+        {
+            Some(if m.os == "windows" {
+                format!("powershell.exe -NoProfile -NonInteractive -Command \"Restart-Service -Name '{service}' -ErrorAction Stop; Write-Output 'Service restart completed'\"")
+            } else {
+                format!("systemctl restart -- '{service}' && printf 'Service restart completed\\n'")
+            })
+        }
+        _ => return Err("Only diagnostics or an explicit service restart is supported.".into()),
+    };
+    let mut keyfile =
+        tempfile::NamedTempFile::new_in(&store.dir).map_err(|_| "Cannot prepare host-key file")?;
+    writeln!(keyfile, "ecpa-{} {}", m.id, m.host_key).map_err(|_| "Cannot write host-key file")?;
+    let keypath = keyfile.into_temp_path();
+    let mut args = ssh_args(&m, &keypath, false);
+    if let Some(command) = remote {
+        *args.last_mut().ok_or("Missing operation")? = command;
+    }
+    let output = run(&ssh_path("ssh"), &args)?;
+    Ok(
+        json!({"machine_id":m.id,"remote_host":m.host,"remote_user":m.user,"operation":action,"output":output}),
     )
 }

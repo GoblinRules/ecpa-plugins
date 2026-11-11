@@ -2,6 +2,7 @@ mod gateway;
 mod helper;
 mod native;
 pub mod portainer;
+mod providers;
 pub mod store;
 pub mod vault;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -111,15 +112,47 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 // A locked executable must not prevent account management from loading.
                 // Settings exposes its state and an authenticated retry action.
                 let _ = helper::install();
-                json!({"schema_version":6,"metadata":{"Name":"Connections Manager","Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":env!("CARGO_PKG_REPOSITORY"),"Logo":"https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/connections-manager.svg","ConfigFields":[{"Name":"data_dir","Type":"string","Description":"Absolute catalogue directory. Leave blank for LocalAppData/ECPA/connections-manager. The helper must use the same directory and Windows user. Never put tokens here."}]},"capabilities":{"management_api":true}})
+                providers::start();
+                json!({"schema_version":6,"metadata":{"Name":"Connections Manager","Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":env!("CARGO_PKG_REPOSITORY"),"Logo":"https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/connections-manager.svg","ConfigFields":[{"Name":"data_dir","Type":"string","Description":"Absolute catalogue directory. Leave blank for LocalAppData/ECPA/connections-manager. The helper must use the same directory and Windows user. Never put tokens here."}]},"capabilities":{"management_api":true,"model_provider":true,"model_router":true,"executor":true,"executor_model_scope":"static","executor_input_formats":["chat-completions"],"executor_output_formats":["chat-completions"]}})
             }
-            "plugin.quiesce" => json!({}),
+            "plugin.quiesce" => {
+                providers::stop();
+                json!({})
+            }
             "plugin.shutdown" => {
+                providers::stop();
                 *DATA
                     .get_or_init(|| Mutex::new(None))
                     .lock()
                     .map_err(|_| "Restart the core")? = None;
                 json!({})
+            }
+            "model.route" => {
+                let request: Value =
+                    serde_json::from_slice(raw).map_err(|_| "Invalid route request")?;
+                let managed = request["RequestedModel"]
+                    .as_str()
+                    .map(|model| model.starts_with("ecpa-"))
+                    .unwrap_or(false);
+                json!({"Handled":managed,"TargetKind":"self","Reason":"Explicit ECPA managed account alias; no provider fallback"})
+            }
+            "model.static" => {
+                gateway::request(&configured()?, &json!({"action":"provider-models"}))
+                    .unwrap_or_else(|_| json!({"Provider":"ecpa-managed","Models":[]}))
+            }
+            "model.for_auth" => json!({"Provider":"ecpa-managed","Models":[]}),
+            "executor.identifier" => json!({"identifier":"ecpa-managed"}),
+            "executor.execute" | "executor.execute_stream" => {
+                let request: Value =
+                    serde_json::from_slice(raw).map_err(|_| "Invalid provider request")?;
+                providers::execute(
+                    &configured()?,
+                    &request,
+                    method == "executor.execute_stream",
+                )?
+            }
+            "executor.count_tokens" | "executor.http_request" => {
+                return Err("This operation is not exposed by managed provider profiles".into())
             }
             "management.register" => {
                 json!({"resources":[{"Path":"/editor","Menu":"Connections Manager","Description":"Named accounts and managed MCP services"},gateway::resource()],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/save")},{"Method":"POST","Path":format!("{API}/delete")},{"Method":"POST","Path":format!("{API}/assign")},{"Method":"POST","Path":format!("{API}/verify")},{"Method":"POST","Path":format!("{API}/helper-check")},{"Method":"POST","Path":format!("{API}/helper-install")},{"Method":"POST","Path":format!("{API}/gateway")}]})

@@ -106,10 +106,11 @@ dependencies = [
 
 [[package]]
 name = "connections-manager"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "base64",
  "fs2",
+ "machine-access",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -441,6 +442,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
+name = "machine-access"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "fs2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "mcp-manager"
 version = "0.7.1"
 dependencies = [
@@ -711,14 +724,13 @@ checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "ssh-machines"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
- "fs2",
+ "machine-access",
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "sha2",
  "tempfile",
 ]
 

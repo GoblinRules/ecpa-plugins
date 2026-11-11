@@ -23,6 +23,21 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Install locked gateway test runtime
+        run: |
+          python -m pip install -r runtime/mcp-gateway/requirements-windows.lock
+          python -m pip install --no-deps --no-build-isolation -e runtime/mcp-gateway
+          python -m pip install pytest==9.0.2 pytest-asyncio==1.3.0
+      - run: python -m pytest runtime/mcp-gateway/tests -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Isolated gateway UI checks
+        run: |
+          npm install --prefix "$env:RUNNER_TEMP/ecpa-ui" playwright@1.56.1
+          $env:NODE_PATH = "$env:RUNNER_TEMP/ecpa-ui/node_modules"
+          node "$env:NODE_PATH/playwright/cli.js" install chromium
+          node tests/gateway-ui.cjs
       - run: python scripts/package.py
       - uses: actions/upload-artifact@v4
         with:

@@ -6,7 +6,7 @@ use crate::{
 use serde_json::{json, Value};
 use std::{io::Read, time::Duration};
 
-pub fn request(store: &Store, body: &Value) -> Result<Value, String> {
+pub fn open(store: &Store, body: &Value, path: &str) -> Result<ureq::Response, String> {
     let raw = std::fs::read(store.dir.join("gateway-runtime.json"))
         .map_err(|_| "MCP runtime is not configured. Run the gateway installer/setup; existing account connections are unchanged.")?;
     if raw.len() > 32768 {
@@ -35,17 +35,31 @@ pub fn request(store: &Store, body: &Value) -> Result<Value, String> {
     }
     let token = SystemVault.read(target)?;
     let client = ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(55))
+        .timeout_read(Duration::from_secs(
+            if path == "/admin" && body["action"] == "approve-request" {
+                150
+            } else {
+                30
+            },
+        ))
+        .timeout_write(Duration::from_secs(15))
+        .timeout_connect(Duration::from_secs(5))
         .redirects(0)
         .build();
     let endpoint = format!(
-        "http://127.0.0.1:{}/admin",
-        url.port_or_known_default().ok_or("Missing runtime port")?
+        "http://127.0.0.1:{}{}",
+        url.port_or_known_default().ok_or("Missing runtime port")?,
+        path
     );
     let response = match client.post(&endpoint).set("Authorization", &format!("Bearer {}", *token)).send_json(body) {
         Ok(r) | Err(ureq::Error::Status(400, r)) => r,
         Err(_) => return Err("MCP runtime is unavailable or authentication failed. Start the configured worker and verify its status.".into()),
     };
+    Ok(response)
+}
+
+pub fn request(store: &Store, body: &Value) -> Result<Value, String> {
+    let response = open(store, body, "/admin")?;
     let mut bytes = Vec::new();
     response
         .into_reader()

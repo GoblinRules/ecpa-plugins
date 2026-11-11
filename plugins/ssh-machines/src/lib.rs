@@ -1,4 +1,4 @@
-mod machines;
+use machine_access as machines;
 mod native;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
