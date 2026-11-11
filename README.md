@@ -30,7 +30,7 @@ Open **Plugins → Plugin store**, refresh, and choose a plugin. Complete ECPA's
 
 ## Shared services and machine management
 
-- **[SSH & Machines](plugins/ssh-machines/README.md)** — Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks, terminal commands and approval-controlled gateway access.
+- **[SSH and Machines](plugins/ssh-machines/README.md)** — Named machines, explicit SSH key/agent selection, independently verified host keys, connection checks, terminal commands and approval-controlled gateway access.
 - **[Managed MCP gateway](runtime/mcp-gateway/README.md)** — Connections Manager's separately installed worker for Bitwarden-backed service profiles and authenticated client access.
 - **[Windows host readiness](runtime/mcp-gateway/HOST-READINESS.md)** — Required versus optional software, runtime identity/bootstrap, startup checks and hardware migration.
 - **[Publication privacy audit](docs/publication-security-audit.md)** — Checked scope, historical compiler-path findings and release safeguards.

@@ -39,6 +39,7 @@ jobs:
           node "$env:NODE_PATH/playwright/cli.js" install chromium
           node tests/gateway-ui.cjs
           node tests/connections-auth.cjs
+          node tests/ssh-auth.cjs
       - run: python scripts/package.py
       - uses: actions/upload-artifact@v4
         with:

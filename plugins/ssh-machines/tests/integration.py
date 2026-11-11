@@ -92,6 +92,10 @@ with tempfile.TemporaryDirectory(prefix='ecpa ssh fixture-') as folder:
             except OSError:pass
             time.sleep(.1)
         else:raise RuntimeError('Isolated core did not start')
+        status,raw=request('/v0/management/plugins')
+        assert status==200
+        plugin=next(p for p in json.loads(raw)['plugins'] if p['id']=='ssh-machines')
+        assert plugin['metadata']['name']=='SSH and Machines', 'Host must return a plain-text sidebar label'
         assert request('/v0/management/ssh-machines/state',auth=False)[0]==401
         status,page=request('/v0/resource/plugins/ssh-machines/editor',auth=False)
         assert status==200 and b'fixture-user' not in page

@@ -87,6 +87,6 @@ fn public_page_contains_no_machine_metadata() {
         .decode(response["result"]["Body"].as_str().unwrap())
         .unwrap();
     let page = String::from_utf8(bytes).unwrap();
-    assert!(page.contains("SSH &amp; Machines"));
+    assert!(page.contains("SSH and Machines"));
     assert!(!page.contains("example.test"));
 }

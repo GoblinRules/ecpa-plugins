@@ -55,7 +55,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                     .get_or_init(|| Mutex::new(None))
                     .lock()
                     .map_err(|_| "Restart plugin")? = Some(s.dir);
-                json!({"schema_version":6,"metadata":{"Name":"SSH & Machines","Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":env!("CARGO_PKG_REPOSITORY"),"Logo":"https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/ssh-machines.svg","ConfigFields":[{"Name":"data_dir","Type":"string","Description":"Private machine catalogue directory on the ECPA host. Defaults to LocalAppData/ECPA/ssh-machines. Do not put keys or passwords in plugin settings."}]},"capabilities":{"management_api":true}})
+                json!({"schema_version":6,"metadata":{"Name":"SSH and Machines","Version":env!("CARGO_PKG_VERSION"),"Author":"GoblinRules","GitHubRepository":env!("CARGO_PKG_REPOSITORY"),"Logo":"https://raw.githubusercontent.com/GoblinRules/ecpa-plugins/master/assets/icons/ssh-machines.svg","ConfigFields":[{"Name":"data_dir","Type":"string","Description":"Private machine catalogue directory on the ECPA host. Defaults to LocalAppData/ECPA/ssh-machines. Do not put keys or passwords in plugin settings."}]},"capabilities":{"management_api":true}})
             }
             "plugin.quiesce" => json!({}),
             "plugin.shutdown" => {
@@ -66,7 +66,7 @@ fn dispatch(method: &str, raw: &[u8]) -> Value {
                 json!({})
             }
             "management.register" => {
-                json!({"resources":[{"Path":"/editor","Menu":"SSH & Machines","Description":"Machine profiles, pinned host keys and connection diagnostics"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/action")}]})
+                json!({"resources":[{"Path":"/editor","Menu":"SSH and Machines","Description":"Machine profiles, pinned host keys and connection diagnostics"}],"routes":[{"Method":"GET","Path":format!("{API}/state")},{"Method":"POST","Path":format!("{API}/action")}]})
             }
             "management.handle" => {
                 let req: Value = serde_json::from_slice(raw).map_err(|_| "Invalid request")?;

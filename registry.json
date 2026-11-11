@@ -150,7 +150,7 @@
     },
     {
       "id": "ssh-machines",
-      "name": "SSH & Machines",
+      "name": "SSH and Machines",
       "description": "Named machines with pinned SSH identities, connection checks and terminal commands; shared gateway access supports approved service restarts.",
       "author": "GoblinRules",
       "repository": "https://github.com/GoblinRules/ecpa-ssh-machines",

@@ -1,13 +1,13 @@
-# SSH & Machines
+# SSH and Machines
 
-Windows x64 native ECPA plugin, version 0.2.0. Manage named machine profiles and
+Windows x64 native ECPA plugin, version 0.2.1. Manage named machine profiles and
 verify their SSH identity from the ECPA host. It does not create a new job scheduler.
 
 ## Set up a machine
 
 1. Install **Windows OpenSSH Client** on the ECPA host. On the target, enable and
    configure an SSH server separately; this plugin never installs one remotely.
-2. Open **Plugins → SSH & Machines**, unlock with the ECPA management key, and
+2. Open **Plugins → SSH and Machines**, unlock with the ECPA management key, and
    choose **Add machine**. Supply its hostname/Tailscale name, SSH port, username,
    remote OS and optional labels.
 3. Select an existing private-key file or the SSH agent. All paths refer to the
@@ -24,6 +24,21 @@ verify their SSH identity from the ECPA host. It does not create a new job sched
 
 No real machine is added or contacted automatically. Choose the operating system
 explicitly; diagnostics do not guess a different account or OS on failure.
+
+## Management login
+
+**Remember key on this device** is optional. It shares the browser's saved management
+key with Connections Manager and other ECPA suite plugins on the same origin. Without
+it, the key lasts only for the current tab session. **Lock & forget** removes this
+plugin's tab key and the shared saved key; other already-open plugins may still hold
+their own session keys. Rejected credentials are cleared; temporary network failures
+retain them. Automatic unlock only reads the catalogue, never starts an SSH connection.
+
+This is browser storage, not native ECPA single sign-on or encrypted credential storage.
+Other pages on this origin can read the saved key. Avoid remembering it on shared devices.
+If browser storage is blocked, manual unlock still works. OpenSSH private keys are never
+copied into browser storage. The display name uses ?and? because some ECPA versions
+HTML-escape ampersands in metadata displayed by their sidebar.
 
 ## Keys, terminals and permissions
 
